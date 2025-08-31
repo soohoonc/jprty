@@ -1,0 +1,24 @@
+{
+  "name": "@jprty/db",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
+  },
+  "devDependencies": {
+    "@jprty/typescript-config": " *",
+    "prisma": "^6.13.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.13.0",
+    "dotenv": "^17.2.1",
+    "zod": "^4.0.14"
+  }
+}

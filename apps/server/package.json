@@ -1,0 +1,16 @@
+{
+  "name": "@jprty/server",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {},
+  "devDependencies": {
+    "@jprty/typescript-config": " *"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1"
+  }
+}
