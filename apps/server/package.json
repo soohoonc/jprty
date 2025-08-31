@@ -3,7 +3,10 @@
   "exports": {
     ".": "./index.ts"
   },
-  "scripts": {},
+  "scripts": {
+    "dev": "bun run index.ts",
+    "start": "bun run index.ts"
+  },
   "devDependencies": {
     "@jprty/typescript-config": " *"
   },
@@ -11,6 +14,11 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "dotenv": "^17.2.1"
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1"
   }
 }

@@ -11,6 +11,32 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
+model Room {
+    id              String          @id @default(cuid())
+    code            String          @unique
+    hostId          String?         @map("host_id")
+    host            User?           @relation(fields: [hostId], references: [id])
+    name            String?
+    status          RoomStatus      @default(WAITING)
+    maxPlayers      Int             @default(8) @map("max_players")
+    isPublic        Boolean         @default(false) @map("is_public")
+    createdAt       DateTime        @default(now()) @map("created_at")
+    updatedAt       DateTime        @updatedAt @map("updated_at")
+    
+    players         Player[]
+    gameSessions    GameSession[]
+    configuration   GameConfiguration?
+    
+    @@map("room")
+}
+
+enum RoomStatus {
+    WAITING
+    IN_GAME
+    FINISHED
+    CLOSED
+}
+
 model User {
     id            String    @id
     name          String
@@ -21,6 +47,10 @@ model User {
     updatedAt     DateTime  @map("updated_at")
     sessions      Session[]
     accounts      Account[]
+    
+    hostedRooms   Room[]
+    players       Player[]
+    statistics    PlayerStatistics?
 
     @@unique([email])
     @@map("user")
@@ -69,4 +99,250 @@ model Verification {
     updatedAt  DateTime? @map("updated_at")
 
     @@map("verification")
+}
+
+model Player {
+    id              String          @id @default(cuid())
+    roomId          String          @map("room_id")
+    room            Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
+    userId          String?         @map("user_id")
+    user            User?           @relation(fields: [userId], references: [id])
+    guestName       String?         @map("guest_name")
+    isHost          Boolean         @default(false) @map("is_host")
+    score           Int             @default(0)
+    isActive        Boolean         @default(true) @map("is_active")
+    joinedAt        DateTime        @default(now()) @map("joined_at")
+    
+    responses       PlayerResponse[]
+    currentPlayer   GameSession[]   @relation("CurrentPlayer")
+    
+    @@unique([roomId, userId])
+    @@map("player")
+}
+
+model Question {
+    id              String          @id @default(cuid())
+    question        String          @db.Text
+    answer          String          @db.Text
+    value           Int
+    round           Int?
+    dailyDoubleValue Int?           @map("daily_double_value")
+    airDate         DateTime?       @map("air_date")
+    comments        String?         @db.Text
+    notes           String?         @db.Text
+    
+    categoryId      String          @map("category_id")
+    category        Category        @relation(fields: [categoryId], references: [id])
+    questionSetId   String?         @map("question_set_id")
+    questionSet     QuestionSet?    @relation(fields: [questionSetId], references: [id])
+    
+    boardCells      BoardCell[]
+    responses       PlayerResponse[]
+    
+    @@index([categoryId])
+    @@index([questionSetId])
+    @@map("question")
+}
+
+model Category {
+    id              String          @id @default(cuid())
+    name            String
+    description     String?         @db.Text
+    
+    questions       Question[]
+    questionSets    QuestionSetCategory[]
+    
+    @@unique([name])
+    @@map("category")
+}
+
+model QuestionSet {
+    id              String          @id @default(cuid())
+    title           String
+    season          Int?
+    airDate         DateTime?       @map("air_date")
+    description     String?         @db.Text
+    difficulty      Difficulty      @default(MEDIUM)
+    
+    questions       Question[]
+    categories      QuestionSetCategory[]
+    gameSessions    GameSession[]
+    
+    createdAt       DateTime        @default(now()) @map("created_at")
+    updatedAt       DateTime        @updatedAt @map("updated_at")
+    
+    @@map("question_set")
+}
+
+model QuestionSetCategory {
+    questionSetId   String          @map("question_set_id")
+    questionSet     QuestionSet     @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+    categoryId      String          @map("category_id")
+    category        Category        @relation(fields: [categoryId], references: [id])
+    order           Int             @default(0)
+    
+    @@id([questionSetId, categoryId])
+    @@map("question_set_category")
+}
+
+model GameSession {
+    id              String          @id @default(cuid())
+    roomId          String          @map("room_id")
+    room            Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
+    questionSetId   String?         @map("question_set_id")
+    questionSet     QuestionSet?    @relation(fields: [questionSetId], references: [id])
+    
+    status          GameStatus      @default(LOBBY)
+    currentRound    Int             @default(1) @map("current_round")
+    currentPlayerId String?         @map("current_player_id")
+    currentPlayer   Player?         @relation("CurrentPlayer", fields: [currentPlayerId], references: [id])
+    
+    startedAt       DateTime?       @map("started_at")
+    endedAt         DateTime?       @map("ended_at")
+    createdAt       DateTime        @default(now()) @map("created_at")
+    
+    gameBoard       GameBoard?
+    responses       PlayerResponse[]
+    
+    @@map("game_session")
+}
+
+model GameBoard {
+    id              String          @id @default(cuid())
+    gameSessionId   String          @unique @map("game_session_id")
+    gameSession     GameSession     @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+    
+    cells           BoardCell[]
+    
+    @@map("game_board")
+}
+
+model BoardCell {
+    id              String          @id @default(cuid())
+    gameBoardId     String          @map("game_board_id")
+    gameBoard       GameBoard       @relation(fields: [gameBoardId], references: [id], onDelete: Cascade)
+    questionId      String          @map("question_id")
+    question        Question        @relation(fields: [questionId], references: [id])
+    
+    row             Int
+    column          Int
+    isAnswered      Boolean         @default(false) @map("is_answered")
+    isDailyDouble   Boolean         @default(false) @map("is_daily_double")
+    
+    @@unique([gameBoardId, row, column])
+    @@map("board_cell")
+}
+
+model PlayerResponse {
+    id              String          @id @default(cuid())
+    playerId        String          @map("player_id")
+    player          Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
+    questionId      String          @map("question_id")
+    question        Question        @relation(fields: [questionId], references: [id])
+    gameSessionId   String          @map("game_session_id")
+    gameSession     GameSession     @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+    
+    response        String          @db.Text
+    isCorrect       Boolean         @map("is_correct")
+    pointsEarned    Int             @map("points_earned")
+    responseTime    Int?            @map("response_time")
+    buzzTime        DateTime?       @map("buzz_time")
+    answeredAt      DateTime        @default(now()) @map("answered_at")
+    
+    @@map("player_response")
+}
+
+model GameConfiguration {
+    id              String          @id @default(cuid())
+    roomId          String          @unique @map("room_id")
+    room            Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
+    
+    buzzWindow      Int             @default(5000) @map("buzz_window")
+    responseWindow  Int             @default(30000) @map("response_window")
+    revealWindow    Int             @default(3000) @map("reveal_window")
+    
+    minYear         Int?            @map("min_year")
+    maxYear         Int?            @map("max_year")
+    difficulty      Difficulty      @default(MEDIUM)
+    categoryTags    String[]        @map("category_tags")
+    
+    createdAt       DateTime        @default(now()) @map("created_at")
+    updatedAt       DateTime        @updatedAt @map("updated_at")
+    
+    @@map("game_configuration")
+}
+
+model PlayerStatistics {
+    id              String          @id @default(cuid())
+    userId          String          @unique @map("user_id")
+    user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+    
+    gamesPlayed     Int             @default(0) @map("games_played")
+    gamesWon        Int             @default(0) @map("games_won")
+    totalScore      Int             @default(0) @map("total_score")
+    correctAnswers  Int             @default(0) @map("correct_answers")
+    wrongAnswers    Int             @default(0) @map("wrong_answers")
+    avgResponseTime Float?          @map("avg_response_time")
+    
+    createdAt       DateTime        @default(now()) @map("created_at")
+    updatedAt       DateTime        @updatedAt @map("updated_at")
+    
+    @@map("player_statistics")
+}
+
+model Leaderboard {
+    id              String          @id @default(cuid())
+    type            LeaderboardType
+    period          String?
+    
+    entries         LeaderboardEntry[]
+    
+    createdAt       DateTime        @default(now()) @map("created_at")
+    updatedAt       DateTime        @updatedAt @map("updated_at")
+    
+    @@unique([type, period])
+    @@map("leaderboard")
+}
+
+model LeaderboardEntry {
+    id              String          @id @default(cuid())
+    leaderboardId   String          @map("leaderboard_id")
+    leaderboard     Leaderboard     @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
+    
+    playerName      String          @map("player_name")
+    userId          String?         @map("user_id")
+    score           Int
+    rank            Int
+    
+    @@unique([leaderboardId, rank])
+    @@map("leaderboard_entry")
+}
+
+enum GameStatus {
+    LOBBY
+    STARTING
+    CATEGORY_REVEAL
+    SELECTING
+    QUESTION_DISPLAY
+    BUZZER_OPEN
+    ANSWERING
+    ANSWER_REVEAL
+    ROUND_END
+    FINAL_JEOPARDY
+    GAME_OVER
+}
+
+enum Difficulty {
+    EASY
+    MEDIUM
+    HARD
+    EXPERT
+}
+
+enum LeaderboardType {
+    GLOBAL
+    DAILY
+    WEEKLY
+    MONTHLY
+    ROOM
 }
