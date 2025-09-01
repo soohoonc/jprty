@@ -1,24 +1,23 @@
 {
   "name": "@jprty/server",
   "exports": {
-    ".": "./index.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "dev": "bun run index.ts",
-    "start": "bun run index.ts"
+    "dev": "bun run src/index.ts",
+    "start": "bun run src/index.ts"
   },
   "devDependencies": {
-    "@jprty/typescript-config": " *"
+    "@jprty/typescript-config": " *",
+    "@types/bun": "^1.2.21"
   },
   "peerDependencies": {
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "cors": "^2.8.5",
+    "@jprty/db": "*",
     "dotenv": "^17.2.1",
-    "express": "^5.1.0",
+    "hono": "^4.6.15",
     "socket.io": "^4.8.1"
   }
 }
