@@ -48,20 +48,19 @@ model Player {
     isActive Boolean  @default(true) @map("is_active")
     joinedAt DateTime @default(now()) @map("joined_at")
 
-    wonGames          GameSession[] @relation("Winner")
-    answeredQuestions Question[]
+    wonGames GameSession[] @relation("Winner")
 
     @@unique([roomId, userId, name])
     @@map("player")
 }
 
 model Question {
-    id         String  @id @default(cuid())
-    clue       String  @db.Text
-    answer     String  @db.Text
-    difficulty Int // 1-5, determines row position
-    Player     Player? @relation(fields: [playerId], references: [id])
-    playerId   String?
+    id            String      @id @default(cuid())
+    clue          String      @db.Text
+    answer        String      @db.Text
+    difficulty    String      // "easy" | "medium" | "hard"
+    questionSetId String      @map("question_set_id")
+    questionSet   QuestionSet @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
 
     @@map("question")
 }
@@ -71,8 +70,11 @@ model QuestionSet {
     title       String
     airDate     DateTime? @map("air_date")
     description String?   @db.Text
+    config      Json?     // { easy: 1, medium: 2, hard: 2 }
 
     categories QuestionSetCategory[]
+    questions  Question[]
+    rounds     Round[]
 
     createdAt DateTime @default(now()) @map("created_at")
     updatedAt DateTime @updatedAt @map("updated_at")
@@ -120,11 +122,14 @@ model GameSession {
 }
 
 model Round {
-    id            String      @id @default(cuid())
-    gameSessionId String      @map("game_session_id")
-    gameSession   GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
-    roundType     RoundType   @map("round_type")
-    roundNumber   Int         @map("round_number")
+    id            String       @id @default(cuid())
+    gameSessionId String       @map("game_session_id")
+    gameSession   GameSession  @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+    roundType     RoundType    @map("round_type")
+    roundNumber   Int          @map("round_number")
+    questionSetId String?      @map("question_set_id")
+    questionSet   QuestionSet? @relation(fields: [questionSetId], references: [id])
+    events        Json[]       @default([])
 
     @@unique([gameSessionId, roundNumber])
     @@map("round")

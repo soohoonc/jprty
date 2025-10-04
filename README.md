@@ -63,3 +63,8 @@ Continue until all rounds are done.
 Display winner. 
 
 
+#
+Room State
+- Players (Host, Guest, Logged in, Active)
+- Game State (Pending, Round, Buzzed)
+- Room State (Waiting, Players, Etc)
