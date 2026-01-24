@@ -59,7 +59,7 @@ export function room(io: Server, socket: Socket) {
           const answeredQuestions: string[] = [];
           board.cells.forEach((row) => {
             row.forEach((cell) => {
-              if (cell.isAnswered) {
+              if (cell.isUsed) {
                 const category = board.categories[cell.col];
                 answeredQuestions.push(`${category}_${cell.value}`);
               }
@@ -135,7 +135,7 @@ export function room(io: Server, socket: Socket) {
         const answeredQuestions: string[] = [];
         board.cells.forEach((row) => {
           row.forEach((cell) => {
-            if (cell.isAnswered) {
+            if (cell.isUsed) {
               const category = board.categories[cell.col];
               answeredQuestions.push(`${category}_${cell.value}`);
             }
@@ -236,6 +236,15 @@ export function room(io: Server, socket: Socket) {
             timeRemaining: newState.timeRemaining,
           });
         }
+        // Emit GAME_END event when game ends (handles timer-based flow from afterReveal)
+        if (newState.phase === 'GAME_END') {
+          const sortedScores = Array.from(newState.scores.entries())
+            .sort((a, b) => b[1] - a[1]);
+          io.to(roomId).emit(GAME_EVENTS.GAME_END, {
+            winner: sortedScores[0],
+            finalScores: sortedScores,
+          });
+        }
         // Broadcast state update for all phase changes
         io.to(roomId).emit(GAME_EVENTS.STATE_UPDATE, {
           phase: newState.phase,
@@ -256,7 +265,7 @@ export function room(io: Server, socket: Socket) {
         const answeredQuestions: string[] = [];
         board.cells.forEach((row) => {
           row.forEach((cell) => {
-            if (cell.isAnswered) {
+            if (cell.isUsed) {
               const category = board.categories[cell.col];
               answeredQuestions.push(`${category}_${cell.value}`);
             }
@@ -313,6 +322,15 @@ export function room(io: Server, socket: Socket) {
               timeRemaining: newState.timeRemaining,
             });
           }
+          // Emit GAME_END event when game ends (handles timer-based flow from afterReveal)
+          if (newState.phase === 'GAME_END') {
+            const sortedScores = Array.from(newState.scores.entries())
+              .sort((a, b) => b[1] - a[1]);
+            io.to(roomId).emit(GAME_EVENTS.GAME_END, {
+              winner: sortedScores[0],
+              finalScores: sortedScores,
+            });
+          }
           // Broadcast state update for all phase changes
           io.to(roomId).emit(GAME_EVENTS.STATE_UPDATE, {
             phase: newState.phase,
@@ -329,7 +347,7 @@ export function room(io: Server, socket: Socket) {
         const answeredQuestions: string[] = [];
         board.cells.forEach((row) => {
           row.forEach((cell) => {
-            if (cell.isAnswered) {
+            if (cell.isUsed) {
               const category = board.categories[cell.col];
               answeredQuestions.push(`${category}_${cell.value}`);
             }

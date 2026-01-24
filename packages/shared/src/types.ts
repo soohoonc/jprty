@@ -48,7 +48,7 @@ export interface Question {
 export interface BoardCell {
   questionId: string;
   value: number;
-  isAnswered: boolean;
+  isUsed: boolean;
   isDailyDouble: boolean;
   row: number;
   col: number;

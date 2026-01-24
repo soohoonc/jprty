@@ -42,7 +42,7 @@ export function useGameMachine({
   const getPlayerName = (id: string | null): string | null => {
     if (!id) return null;
     const player = room?.players?.find((p) => p.id === id);
-    return player?.name || player?.user?.name || id;
+    return player?.name || player?.user?.name || null;
   };
 
   // Sync identity when it changes
@@ -64,13 +64,16 @@ export function useGameMachine({
     if (!serverState) return;
 
     if (serverState.board) {
+      // Extract unique values from grid, sorted ascending
+      const values = [...new Set(serverState.board.grid?.map((c) => c.value) ?? [])].sort((a, b) => a - b);
       const board: GameBoard = {
         categories: serverState.board.categories,
         answeredQuestions: new Set(
           serverState.board.grid
-            ?.filter((c) => c.isAnswered)
+            ?.filter((c) => c.isUsed)
             .map((c) => `${serverState.board!.categories[c.col]}_${c.value}`) ?? []
         ),
+        values: values.length > 0 ? values : [200, 400], // Fallback for testing
       };
       send({ type: "UPDATE_BOARD", board });
     }
@@ -148,8 +151,18 @@ export function useGameMachine({
           value: d.currentQuestion.value || 0,
         };
       }
-      // Include buzzer info from currentPlayerId (but don't overwrite name with ID)
-      if (d.currentPlayerId) {
+      // Handle Daily Double phases - set dailyDoublePlayerId
+      if (d.phase === "DAILY_DOUBLE" || d.phase === "DAILY_DOUBLE_ANSWER") {
+        if (d.currentPlayerId) {
+          syncData.isDailyDouble = true;
+          syncData.dailyDoublePlayerId = d.currentPlayerId;
+          syncData.maxWager = d.maxWager || 1000;
+        }
+        if (d.currentWager !== undefined) {
+          syncData.currentWager = d.currentWager;
+        }
+      } else if (d.currentPlayerId) {
+        // Include buzzer info from currentPlayerId (but don't overwrite name with ID)
         syncData.buzzedPlayerId = d.currentPlayerId;
         // Only set name if server provides it, otherwise let PLAYER_BUZZED set it
         if (d.currentPlayerName) {
@@ -201,6 +214,7 @@ export function useGameMachine({
         maxWager: d.maxWager,
         question: d.question,
         value: d.value,
+        category: d.category,
       });
     };
 

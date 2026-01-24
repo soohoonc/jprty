@@ -20,6 +20,7 @@ export interface AnswerResult {
 export interface GameBoard {
   categories: string[];
   answeredQuestions: Set<string>;
+  values: number[];
 }
 
 export type PlayerScore = [string, number];
@@ -59,7 +60,7 @@ export type GameEvent =
   | { type: "UPDATE_SCORES"; scores: PlayerScore[] }
   | { type: "UPDATE_SELECTOR"; selectorPlayerId: string }
   | { type: "GAME_END" }
-  | { type: "DAILY_DOUBLE"; playerId: string; questionId: string; maxWager: number; question?: { id: string; clue: string }; value?: number }
+  | { type: "DAILY_DOUBLE"; playerId: string; questionId: string; maxWager: number; question?: { id: string; clue: string }; value?: number; category?: string }
   | { type: "WAGER_SUBMITTED"; timeRemaining?: number };
 
 export const gameMachine = setup({
@@ -162,7 +163,7 @@ export const gameMachine = setup({
         currentQuestion: event.question ? {
           id: event.question.id,
           clue: event.question.clue,
-          category: event.questionId?.split("_")[0] || "Unknown",
+          category: event.category || event.questionId?.split("_")[0] || "Unknown",
           value: event.value || 0,
         } : null,
       };
@@ -236,7 +237,7 @@ export const gameMachine = setup({
       { guard: ({ event }) => event.phase === "REVEALING", target: ".revealing", actions: "syncContext" },
       { guard: ({ event }) => event.phase === "DAILY_DOUBLE", target: ".dailyDouble", actions: "syncContext" },
       { guard: ({ event }) => event.phase === "DAILY_DOUBLE_ANSWER", target: ".dailyDoubleAnswer", actions: "syncContext" },
-      { guard: ({ event }) => event.phase === "ENDED", target: ".gameEnd", actions: "syncContext" },
+      { guard: ({ event }) => event.phase === "ENDED" || event.phase === "GAME_END", target: ".gameEnd", actions: "syncContext" },
     ],
   },
 
@@ -286,6 +287,7 @@ export const gameMachine = setup({
     dailyDouble: {
       // Waiting for wager submission
       on: {
+        DAILY_DOUBLE: { actions: "setDailyDouble" }, // Handle event even if already in this state
         WAGER_SUBMITTED: { target: "dailyDoubleAnswer", actions: ["setWager", "setDailyDoubleAnswering"] },
         QUESTION_SELECTED: { target: "dailyDoubleAnswer", actions: ["setQuestion", "setDailyDoubleAnswering"] },
         TICK: { actions: "tick" },

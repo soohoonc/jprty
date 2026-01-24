@@ -496,7 +496,7 @@ export const gameRouter = createTRPCRouter({
           grid?: Array<{
             questionId: string;
             value: number;
-            isAnswered: boolean;
+            isUsed: boolean;
             isDailyDouble: boolean;
             col: number;
           }>;

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   generateDailyDoublePositions,
   createGameBoard,
-  markQuestionAnswered,
+  markQuestionUsed,
   isBoardComplete,
   getBoardCell,
 } from './board';
@@ -104,18 +104,18 @@ describe('createGameBoard', () => {
     expect(board.totalQuestions).toBe(30);
   });
 
-  test('all cells start as unanswered', () => {
+  test('all cells start as unused', () => {
     const board = createGameBoard(mockCategories, mockQuestions, 'SINGLE_JEOPARDY');
 
     for (const row of board.cells) {
       for (const cell of row) {
-        expect(cell.isAnswered).toBe(false);
+        expect(cell.isUsed).toBe(false);
       }
     }
   });
 });
 
-describe('markQuestionAnswered', () => {
+describe('markQuestionUsed', () => {
   const mockCategories = ['Cat1', 'Cat2', 'Cat3', 'Cat4', 'Cat5', 'Cat6'];
   const mockQuestions = Array.from({ length: 30 }, (_, i) => ({
     id: `q${i}`,
@@ -124,20 +124,20 @@ describe('markQuestionAnswered', () => {
     difficulty: 'medium',
   }));
 
-  test('marks question as answered', () => {
+  test('marks question as used', () => {
     const board = createGameBoard(mockCategories, mockQuestions, 'SINGLE_JEOPARDY');
     const questionId = board.cells[0]![0]!.questionId;
 
-    const newBoard = markQuestionAnswered(board, questionId);
+    const newBoard = markQuestionUsed(board, questionId);
 
-    expect(newBoard.cells[0]![0]!.isAnswered).toBe(true);
+    expect(newBoard.cells[0]![0]!.isUsed).toBe(true);
   });
 
   test('increments answered count', () => {
     const board = createGameBoard(mockCategories, mockQuestions, 'SINGLE_JEOPARDY');
     const questionId = board.cells[0]![0]!.questionId;
 
-    const newBoard = markQuestionAnswered(board, questionId);
+    const newBoard = markQuestionUsed(board, questionId);
 
     expect(newBoard.answeredCount).toBe(1);
   });
@@ -146,21 +146,21 @@ describe('markQuestionAnswered', () => {
     const board = createGameBoard(mockCategories, mockQuestions, 'SINGLE_JEOPARDY');
     const questionId = board.cells[0]![0]!.questionId;
 
-    const newBoard = markQuestionAnswered(board, questionId);
+    const newBoard = markQuestionUsed(board, questionId);
 
-    // Check other cells are still unanswered
-    expect(newBoard.cells[0]![1]!.isAnswered).toBe(false);
-    expect(newBoard.cells[1]![0]!.isAnswered).toBe(false);
+    // Check other cells are still unused
+    expect(newBoard.cells[0]![1]!.isUsed).toBe(false);
+    expect(newBoard.cells[1]![0]!.isUsed).toBe(false);
   });
 
   test('returns new board object (immutable)', () => {
     const board = createGameBoard(mockCategories, mockQuestions, 'SINGLE_JEOPARDY');
     const questionId = board.cells[0]![0]!.questionId;
 
-    const newBoard = markQuestionAnswered(board, questionId);
+    const newBoard = markQuestionUsed(board, questionId);
 
     expect(newBoard).not.toBe(board);
-    expect(board.cells[0]![0]!.isAnswered).toBe(false); // Original unchanged
+    expect(board.cells[0]![0]!.isUsed).toBe(false); // Original unchanged
   });
 });
 
@@ -181,23 +181,23 @@ describe('isBoardComplete', () => {
   test('returns false for partially completed board', () => {
     let board = createGameBoard(mockCategories, mockQuestions, 'SINGLE_JEOPARDY');
 
-    // Mark half the questions as answered
+    // Mark half the questions as used
     for (let i = 0; i < 15; i++) {
       const row = Math.floor(i / 6);
       const col = i % 6;
-      board = markQuestionAnswered(board, board.cells[row]![col]!.questionId);
+      board = markQuestionUsed(board, board.cells[row]![col]!.questionId);
     }
 
     expect(isBoardComplete(board)).toBe(false);
   });
 
-  test('returns true when all questions answered', () => {
+  test('returns true when all questions used', () => {
     let board = createGameBoard(mockCategories, mockQuestions, 'SINGLE_JEOPARDY');
 
-    // Mark all questions as answered
+    // Mark all questions as used
     for (const row of board.cells) {
       for (const cell of row) {
-        board = markQuestionAnswered(board, cell.questionId);
+        board = markQuestionUsed(board, cell.questionId);
       }
     }
 

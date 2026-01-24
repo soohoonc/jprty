@@ -1,14 +1,15 @@
 import type { RoundType } from '@jprty/db';
 
 export const GAME_CONFIG = {
-  categoriesPerRound: 6,
-  questionsPerCategory: 5,
+  // TESTING: Reduced board size (normally 6 categories, 5 questions each)
+  categoriesPerRound: 2,
+  questionsPerCategory: 2,
 
-  // Point values per row (1-5) for Single Jeopardy
-  singleJeopardyValues: [200, 400, 600, 800, 1000],
+  // Point values per row for Single Jeopardy (reduced to 2 for testing)
+  singleJeopardyValues: [200, 400],
 
-  // Point values per row (1-5) for Double Jeopardy
-  doubleJeopardyValues: [400, 800, 1200, 1600, 2000],
+  // Point values per row for Double Jeopardy (reduced to 2 for testing)
+  doubleJeopardyValues: [400, 800],
 
   // Daily Doubles per round
   dailyDoublesPerRound: {
@@ -69,7 +70,7 @@ export interface RoundEvent {
 export interface BoardCell {
   questionId: string;
   value: number;
-  isAnswered: boolean;
+  isUsed: boolean;
   isDailyDouble: boolean;
   row: number;
   col: number;

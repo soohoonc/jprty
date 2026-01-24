@@ -2,7 +2,7 @@ import { db, Question, RoundType } from '@jprty/db';
 import {
   initializeRound,
   getBoardQuestions,
-  markQuestionAnswered,
+  markQuestionUsed,
   isBoardComplete,
   getBoardCell,
 } from './board';
@@ -89,7 +89,7 @@ export interface GameStateSnapshot {
     grid?: Array<{
       questionId: string;
       value: number;
-      isAnswered: boolean;
+      isUsed: boolean;
       isDailyDouble: boolean;
       col: number;
     }>;
@@ -105,6 +105,7 @@ export interface GameStateSnapshot {
   buzzQueue: string[];
   timeRemaining?: number;
   currentWager?: number;
+  maxWager?: number;
 }
 
 class GameStateManager {
@@ -112,7 +113,8 @@ class GameStateManager {
   private timers: Map<string, NodeJS.Timeout> = new Map();
   private callbacks: Map<string, (state: GameState) => void> = new Map();
 
-  create(roomId: string, totalRounds: number = 3): GameState {
+  create(roomId: string): GameState {
+    const totalRounds = 1;
     const state: GameState = {
       roomId,
       phase: 'LOBBY',
@@ -149,7 +151,7 @@ class GameStateManager {
     const grid = state.board?.cells.flat().map(cell => ({
       questionId: cell.questionId,
       value: cell.value,
-      isAnswered: cell.isAnswered,
+      isUsed: cell.isUsed,
       isDailyDouble: cell.isDailyDouble,
       col: cell.col,
     }));
@@ -176,6 +178,9 @@ class GameStateManager {
       buzzQueue: state.buzzQueue,
       timeRemaining: state.timeRemaining,
       currentWager: state.currentWager,
+      maxWager: state.phase === 'DAILY_DOUBLE' || state.phase === 'DAILY_DOUBLE_ANSWER'
+        ? calculateMaxWager(state.scores.get(state.currentPlayerId || '') || 0, state.roundType)
+        : undefined,
     };
   }
 
@@ -283,7 +288,10 @@ class GameStateManager {
 
     const cell = getBoardCell(state.board, questionId);
     if (!cell) throw new Error('Question not found on board');
-    if (cell.isAnswered) throw new Error('Question already answered');
+    if (cell.isUsed) throw new Error('Question already used');
+
+    // Mark question as used immediately on selection
+    state.board = markQuestionUsed(state.board, cell.questionId);
 
     // Bug #1 Fix: Fetch question from database using the actual questionId
     const question = await db.question.findUnique({
@@ -516,10 +524,7 @@ class GameStateManager {
     const state = this.games.get(roomId);
     if (!state || !state.board) return;
 
-    // Mark question as answered
-    if (state.currentQuestion) {
-      state.board = markQuestionAnswered(state.board, state.currentQuestion.id);
-    }
+    // Question was already marked as used in selectQuestion()
 
     // If no one answered correctly, the original selector keeps control
     // (selectorPlayerId is already set to whoever selected the question, so no change needed)
@@ -736,10 +741,7 @@ class GameStateManager {
     // Clear any pending timers (e.g., reveal delay timer)
     this.clearTimer(roomId);
 
-    // Mark current question as answered if there is one
-    if (state.currentQuestion && state.board) {
-      state.board = markQuestionAnswered(state.board, state.currentQuestion.id);
-    }
+    // Question was already marked as used in selectQuestion()
 
     // Check if board is complete
     if (state.board && isBoardComplete(state.board)) {
@@ -781,6 +783,14 @@ class GameStateManager {
           endedAt: new Date(),
           winnerId,
         },
+      });
+    }
+
+    // Persist player scores to database
+    for (const [playerId, score] of state.scores.entries()) {
+      await db.player.update({
+        where: { id: playerId },
+        data: { score },
       });
     }
 

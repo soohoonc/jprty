@@ -58,7 +58,7 @@ function AlertDialogContent({
         data-slot="alert-dialog-content"
         data-size={size}
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 group/alert-dialog-content fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-lg",
+          "bg-blue-800 text-white data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 group/alert-dialog-content fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-blue-700 p-6 shadow-lg duration-200 data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-lg",
           className
         )}
         {...props}
@@ -107,7 +107,7 @@ function AlertDialogTitle({
     <AlertDialogPrimitive.Title
       data-slot="alert-dialog-title"
       className={cn(
-        "text-lg font-semibold sm:group-data-[size=default]/alert-dialog-content:group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2",
+        "text-lg font-semibold text-yellow-400 sm:group-data-[size=default]/alert-dialog-content:group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2",
         className
       )}
       {...props}
@@ -122,7 +122,7 @@ function AlertDialogDescription({
   return (
     <AlertDialogPrimitive.Description
       data-slot="alert-dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-white/70 text-sm", className)}
       {...props}
     />
   )
@@ -155,7 +155,7 @@ function AlertDialogAction({
     <Button variant={variant} size={size} asChild>
       <AlertDialogPrimitive.Action
         data-slot="alert-dialog-action"
-        className={cn(className)}
+        className={cn("bg-yellow-500 hover:bg-yellow-600 text-blue-900 font-bold", className)}
         {...props}
       />
     </Button>
@@ -173,7 +173,7 @@ function AlertDialogCancel({
     <Button variant={variant} size={size} asChild>
       <AlertDialogPrimitive.Cancel
         data-slot="alert-dialog-cancel"
-        className={cn(className)}
+        className={cn("bg-blue-700 hover:bg-blue-600 text-white border-blue-600", className)}
         {...props}
       />
     </Button>

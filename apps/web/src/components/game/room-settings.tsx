@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useCallback, useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2, Minus, Plus } from "lucide-react";
@@ -107,9 +106,8 @@ function NumberInput({ value, onChange, min, max, step, unit, divisor = 1 }: Num
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
         <Button
-          variant="outline"
           size="icon"
-          className="h-9 w-9"
+          className="h-9 w-9 bg-blue-700 hover:bg-blue-600 text-white border-none"
           onClick={decrement}
           disabled={displayValue <= displayMin}
         >
@@ -125,26 +123,25 @@ function NumberInput({ value, onChange, min, max, step, unit, divisor = 1 }: Num
             onFocus={handleFocus}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className={`w-20 h-9 text-center font-medium border rounded-md bg-background
-              ${error ? "border-destructive" : "border-input"}
-              focus:outline-none focus:ring-2 focus:ring-ring`}
+            className={`w-20 h-9 text-center font-medium border rounded-md bg-blue-700 text-white
+              ${error ? "border-red-500" : "border-blue-600"}
+              focus:outline-none focus:ring-2 focus:ring-yellow-400`}
           />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 text-sm pointer-events-none">
             {unit}
           </span>
         </div>
 
         <Button
-          variant="outline"
           size="icon"
-          className="h-9 w-9"
+          className="h-9 w-9 bg-blue-700 hover:bg-blue-600 text-white border-none"
           onClick={increment}
           disabled={displayValue >= displayMax}
         >
           <Plus className="h-4 w-4" />
         </Button>
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   );
 }
@@ -171,7 +168,6 @@ export function RoomSettings({ roomId, roomCode, isHost }: RoomSettingsProps) {
   // Use server state directly - NumberInput handles its own local state for immediate feedback
   const buzzWindowMs = config?.buzzWindowMs ?? 5000;
   const answerWindowMs = config?.answerWindowMs ?? 30000;
-  const roundCount = config?.roundCount ?? 1;
 
   const updateConfig = api.game.updateRoomConfig.useMutation({
     onSuccess: () => {
@@ -204,42 +200,36 @@ export function RoomSettings({ roomId, roomCode, isHost }: RoomSettingsProps) {
 
   if (!isHost) {
     return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle>Settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
+      <div className="bg-blue-800 rounded-lg overflow-hidden">
+        <div className="bg-blue-950 px-4 py-2">
+          <p className="text-yellow-400 text-sm font-semibold uppercase tracking-wide">Settings</p>
+        </div>
+        <div className="p-4 space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Buzz Window</span>
-            <span>{buzzWindowMs / 1000}s</span>
+            <span className="text-white/60">Buzz Window</span>
+            <span className="text-white">{buzzWindowMs / 1000}s</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Answer Time</span>
-            <span>{answerWindowMs / 1000}s</span>
+            <span className="text-white/60">Answer Time</span>
+            <span className="text-white">{answerWindowMs / 1000}s</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Rounds</span>
-            <span>{roundCount}</span>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2">
-          Settings
-          {updateConfig.isPending && (
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="bg-blue-800 rounded-lg overflow-hidden">
+      <div className="bg-blue-950 px-4 py-2 flex items-center gap-2">
+        <p className="text-yellow-400 text-sm font-semibold uppercase tracking-wide">Settings</p>
+        {updateConfig.isPending && (
+          <Loader2 className="h-4 w-4 animate-spin text-white/50" />
+        )}
+      </div>
+      <div className="p-4 space-y-4">
         {/* Buzz Window */}
         <div className="space-y-2">
-          <Label>Buzz Window</Label>
+          <Label className="text-white">Buzz Window</Label>
           <NumberInput
             value={buzzWindowMs}
             onChange={(value) => debouncedUpdate({ buzzWindowMs: value })}
@@ -253,7 +243,7 @@ export function RoomSettings({ roomId, roomCode, isHost }: RoomSettingsProps) {
 
         {/* Answer Time */}
         <div className="space-y-2">
-          <Label>Answer Time</Label>
+          <Label className="text-white">Answer Time</Label>
           <NumberInput
             value={answerWindowMs}
             onChange={(value) => debouncedUpdate({ answerWindowMs: value })}
@@ -264,24 +254,7 @@ export function RoomSettings({ roomId, roomCode, isHost }: RoomSettingsProps) {
             divisor={1000}
           />
         </div>
-
-        {/* Round Count */}
-        <div className="space-y-2">
-          <Label>Rounds</Label>
-          <div className="flex gap-2">
-            {[1, 2, 3].map((value) => (
-              <Button
-                key={value}
-                variant={roundCount === value ? "default" : "outline"}
-                size="sm"
-                onClick={() => debouncedUpdate({ roundCount: value })}
-              >
-                {value === 1 ? "Single" : value === 2 ? "Double" : "Full"}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

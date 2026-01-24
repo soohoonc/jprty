@@ -24,6 +24,8 @@ export default function PlayerPage() {
   const [playerAnswer, setPlayerAnswer] = useState("");
   const [categoryIdx, setCategoryIdx] = useState(0);
   const [wagerAmount, setWagerAmount] = useState(5);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
 
   // Get playerId on mount
   useEffect(() => {
@@ -61,18 +63,9 @@ export default function PlayerPage() {
     roomCode,
     playerId,
     enabled: !!playerId && isConnected,
-    onGameEnd: () => { toast.success("Game Over!"); router.push(`/room/${roomCode}/results`); },
+    onGameEnd: () => router.push(`/room/${roomCode}/results`),
     onError: (msg) => toast.error(msg),
   });
-
-  // Show result toast
-  useEffect(() => {
-    if (lastAnswer?.playerId === playerId) {
-      toast[lastAnswer.isCorrect ? "success" : "error"](
-        `${lastAnswer.isCorrect ? "Correct" : "Wrong"}! ${lastAnswer.isCorrect ? "+" : ""}${lastAnswer.pointChange}`
-      );
-    }
-  }, [lastAnswer, playerId]);
 
   const handleSubmit = () => { submitAnswer(playerAnswer); setPlayerAnswer(""); };
 
@@ -87,48 +80,80 @@ export default function PlayerPage() {
   return (
     <div className="min-h-screen bg-blue-900 p-4 pb-20">
       <div className="max-w-2xl mx-auto">
-        <div className="mb-6">
-          <span className="text-white/60 text-xs font-mono tracking-widest">{roomCode}</span>
+        <div className="mb-4 text-center">
+          <span className="text-white text-sm font-mono">{roomCode}</span>
         </div>
 
         {/* Category Picker (Selector only) */}
         {isSelecting && isSelector && board && !currentQuestion && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setCategoryIdx((i) => (i > 0 ? i - 1 : board.categories.length - 1))} className="text-white hover:bg-white/10">
-                <ChevronLeft className="h-8 w-8" />
+            <div className="bg-blue-800 text-white flex items-center justify-between p-2">
+              <Button variant="ghost" size="icon" onClick={() => {
+                const newIdx = categoryIdx > 0 ? categoryIdx - 1 : board.categories.length - 1;
+                isScrollingRef.current = true;
+                setCategoryIdx(newIdx);
+                scrollContainerRef.current?.children[newIdx]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+                setTimeout(() => { isScrollingRef.current = false; }, 300);
+              }} className="text-white hover:bg-white/10 h-10 w-10">
+                <ChevronLeft className="h-6 w-6" />
               </Button>
-              <p className="text-white/50 text-sm">{categoryIdx + 1} of {board.categories.length}</p>
-              <Button variant="ghost" size="icon" onClick={() => setCategoryIdx((i) => (i < board.categories.length - 1 ? i + 1 : 0))} className="text-white hover:bg-white/10">
-                <ChevronRight className="h-8 w-8" />
+              <span className="text-lg font-semibold uppercase">{board.categories[categoryIdx]}</span>
+              <Button variant="ghost" size="icon" onClick={() => {
+                const newIdx = categoryIdx < board.categories.length - 1 ? categoryIdx + 1 : 0;
+                isScrollingRef.current = true;
+                setCategoryIdx(newIdx);
+                scrollContainerRef.current?.children[newIdx]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+                setTimeout(() => { isScrollingRef.current = false; }, 300);
+              }} className="text-white hover:bg-white/10 h-10 w-10">
+                <ChevronRight className="h-6 w-6" />
               </Button>
             </div>
 
-            <div className="space-y-2">
-              <div className="bg-blue-800 text-white text-center p-4 text-lg font-semibold uppercase">
-                {board.categories[categoryIdx]}
-              </div>
-              {[200, 400, 600, 800, 1000].map((value) => {
-                const qid = `${board.categories[categoryIdx]}_${value}`;
-                const answered = board.answeredQuestions?.has(qid);
-                return (
-                  <button
-                    key={qid}
-                    disabled={answered}
-                    onClick={() => selectQuestion(qid)}
-                    className={`w-full h-16 flex items-center justify-center text-2xl font-bold text-yellow-400 rounded-lg transition-all ${
-                      answered ? "bg-blue-950 cursor-not-allowed opacity-30" : "bg-blue-700 hover:bg-blue-600 active:scale-95"
-                    }`}
-                  >
-                    {!answered && `$${value}`}
-                  </button>
-                );
-              })}
+            <div
+              ref={scrollContainerRef}
+              className="flex snap-x snap-mandatory overflow-x-auto gap-4"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              onScroll={(e) => {
+                if (isScrollingRef.current) return;
+                const container = e.currentTarget;
+                const scrollLeft = container.scrollLeft;
+                const cardWidth = container.offsetWidth;
+                const newIdx = Math.round(scrollLeft / cardWidth);
+                if (newIdx !== categoryIdx && newIdx >= 0 && newIdx < board.categories.length) {
+                  setCategoryIdx(newIdx);
+                }
+              }}
+            >
+              {board.categories.map((category, catIdx) => (
+                <div key={category} className="flex-none w-full snap-start space-y-2">
+                  {(board.values || [200, 400]).map((value) => {
+                    const qid = `${category}_${value}`;
+                    const answered = board.answeredQuestions?.has(qid);
+                    return (
+                      <button
+                        key={qid}
+                        disabled={answered || catIdx !== categoryIdx}
+                        onClick={() => selectQuestion(qid)}
+                        className={`w-full h-16 flex items-center justify-center text-2xl font-bold text-yellow-400 rounded-lg transition-all ${
+                          answered ? "bg-blue-950 cursor-not-allowed opacity-30" : "bg-blue-700 hover:bg-blue-600 active:scale-95"
+                        }`}
+                      >
+                        {!answered && `$${value}`}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
 
             <div className="flex justify-center gap-2 pt-2">
               {board.categories.map((_, i) => (
-                <button key={i} onClick={() => setCategoryIdx(i)} className={`w-2 h-2 rounded-full transition-all ${i === categoryIdx ? "bg-yellow-400 w-4" : "bg-white/30"}`} />
+                <button key={i} onClick={() => {
+                  isScrollingRef.current = true;
+                  setCategoryIdx(i);
+                  scrollContainerRef.current?.children[i]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+                  setTimeout(() => { isScrollingRef.current = false; }, 300);
+                }} className={`w-2 h-2 rounded-full transition-all ${i === categoryIdx ? "bg-yellow-400 w-4" : "bg-white/30"}`} />
               ))}
             </div>
           </div>
@@ -203,7 +228,7 @@ export default function PlayerPage() {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-yellow-400 font-bold text-2xl mb-2">
-                    {dailyDoublePlayerName} hit a Daily Double!
+                    {dailyDoublePlayerName || "Player"} hit a Daily Double!
                   </p>
                   <p className="text-white/60">Waiting for wager...</p>
                 </div>
@@ -256,7 +281,7 @@ export default function PlayerPage() {
               ) : (
                 <div className="text-center py-4">
                   <p className="text-yellow-400 font-medium">
-                    {dailyDoublePlayerName} is answering...
+                    {dailyDoublePlayerName || "Player"} is answering...
                   </p>
                 </div>
               )}
@@ -319,40 +344,26 @@ export default function PlayerPage() {
                 </div>
               )}
 
-              {/* Result feedback - personalized per player */}
-              {isRevealing && lastAnswer && lastAnswer.playerId === playerId && (
-                <div className={`text-center p-6 rounded-lg ${lastAnswer.isCorrect ? "bg-green-500/20 border-2 border-green-400" : "bg-red-500/20 border-2 border-red-400"}`}>
-                  <p className={`font-bold text-3xl mb-2 ${lastAnswer.isCorrect ? "text-green-400" : "text-red-400"}`}>
-                    {lastAnswer.isCorrect ? "CORRECT!" : "WRONG!"}
-                  </p>
-                  <p className="text-white/80 mb-3">You answered: &quot;{lastAnswer.answer}&quot;</p>
-                  {!lastAnswer.isCorrect && correctAnswer && (
-                    <div className="pt-3 border-t border-white/20">
-                      <p className="text-sm text-white/60 uppercase tracking-wide">Correct answer</p>
-                      <p className="text-xl font-bold text-yellow-400 mt-1">{correctAnswer}</p>
-                    </div>
+              {/* Result feedback */}
+              {isRevealing && lastAnswer && (
+                <div className="text-center space-y-2">
+                  {lastAnswer.playerId === playerId && (
+                    <p className="text-white/60 text-sm">
+                      You answered: &quot;{lastAnswer.answer}&quot;
+                      <span className={`ml-2 ${lastAnswer.isCorrect ? "text-green-400" : "text-red-400"}`}>
+                        {lastAnswer.isCorrect ? "✓" : "✗"}
+                      </span>
+                    </p>
                   )}
-                </div>
-              )}
-
-              {/* For other players - just show the correct answer */}
-              {isRevealing && lastAnswer && lastAnswer.playerId !== playerId && (
-                <div className="text-center p-6 rounded-lg bg-blue-950 border-2 border-yellow-500/50">
-                  <p className="text-sm text-white/60 uppercase tracking-wide">Correct answer</p>
-                  <p className="text-xl font-bold text-yellow-400 mt-1">{correctAnswer}</p>
+                  <p className="text-yellow-400 text-xl font-semibold">{correctAnswer}</p>
                 </div>
               )}
 
               {/* Reveal answer when no one answered (timeout) */}
-              {isRevealing && !lastAnswer && (
-                <div className="text-center p-6 rounded-lg bg-blue-950 border-2 border-yellow-500/50">
-                  <p className="font-bold text-2xl mb-3 text-white/60">Time&apos;s Up!</p>
-                  {correctAnswer && (
-                    <>
-                      <p className="text-sm text-white/60 uppercase tracking-wide">Correct answer</p>
-                      <p className="text-xl font-bold text-yellow-400 mt-1">{correctAnswer}</p>
-                    </>
-                  )}
+              {isRevealing && !lastAnswer && correctAnswer && (
+                <div className="text-center space-y-2">
+                  <p className="text-white/50 text-sm">Time&apos;s up</p>
+                  <p className="text-yellow-400 text-xl font-semibold">{correctAnswer}</p>
                 </div>
               )}
 

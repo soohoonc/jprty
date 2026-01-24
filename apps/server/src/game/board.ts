@@ -107,7 +107,7 @@ export function createGameBoard(
       rowCells.push({
         questionId: question?.id || `placeholder-${row}-${col}`,
         value: config.values[row] || 200,
-        isAnswered: false,
+        isUsed: false,
         isDailyDouble,
         row,
         col,
@@ -199,11 +199,11 @@ export function getQuestionValue(board: GameBoard, questionId: string): number {
   return 0;
 }
 
-export function markQuestionAnswered(board: GameBoard, questionId: string): GameBoard {
+export function markQuestionUsed(board: GameBoard, questionId: string): GameBoard {
   const newCells = board.cells.map(row =>
     row.map(cell => {
       if (cell.questionId === questionId) {
-        return { ...cell, isAnswered: true };
+        return { ...cell, isUsed: true };
       }
       return cell;
     })

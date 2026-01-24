@@ -5,12 +5,10 @@ import { useRouter } from "next/navigation";
 import { useSocket } from "@/lib/socket";
 import { api } from "@/trpc/react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Copy } from "lucide-react";
 import { RoomSettings } from "@/components/game/room-settings";
 import { ROOM_EVENTS } from "@jprty/shared";
 
@@ -109,13 +107,6 @@ export default function Home() {
     socket?.emit(ROOM_EVENTS.START_GAME);
   };
 
-  const handleCopyCode = () => {
-    if (roomCode) {
-      navigator.clipboard.writeText(roomCode);
-      toast.success("Copied!");
-    }
-  };
-
   // Don't render until we've determined the view mode
   if (viewMode === null) {
     return (
@@ -129,53 +120,63 @@ export default function Home() {
   if (viewMode === 'host') {
     return (
       <div className="min-h-screen bg-blue-900 p-4">
-        <div className="max-w-2xl mx-auto space-y-4">
-          <h1 className="text-4xl font-bold text-white text-center py-4">JPRTY!</h1>
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-4xl font-bold text-yellow-400 text-center py-4 uppercase tracking-wide">JPRTY!</h1>
 
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <p className="text-sm text-muted-foreground mb-2">Room Code</p>
-              {roomCode ? (
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-4xl font-mono font-bold tracking-widest">{roomCode}</span>
-                  <Button variant="ghost" size="sm" onClick={handleCopyCode}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Left Column - Room Code & Settings */}
+            <div className="space-y-4">
+              <div className="bg-blue-800 rounded-lg overflow-hidden">
+                <div className="bg-blue-950 px-4 py-2">
+                  <p className="text-yellow-400 text-sm font-semibold uppercase tracking-wide">Room Code</p>
                 </div>
-              ) : (
-                <span className="text-2xl text-muted-foreground">Creating...</span>
-              )}
-            </CardContent>
-          </Card>
+                <div className="p-6 text-center">
+                  {roomCode ? (
+                    <span className="text-5xl font-mono font-bold tracking-widest text-white">{roomCode}</span>
+                  ) : (
+                    <span className="text-2xl text-white/50">Creating...</span>
+                  )}
+                </div>
+              </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle>Players ({players.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {players.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">Waiting for players...</p>
-              ) : (
-                <div className="space-y-2">
-                  {players.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-2 border rounded">
-                      <span>{p.name || p.user?.name}</span>
-                      {!p.isActive && <Badge variant="outline">Offline</Badge>}
+              {roomId && roomCode && <RoomSettings roomId={roomId} roomCode={roomCode} isHost={true} />}
+            </div>
+
+            {/* Right Column - Players & Start */}
+            <div className="flex flex-col">
+              <div className="bg-blue-800 rounded-lg overflow-hidden flex-1">
+                <div className="bg-blue-950 px-4 py-2">
+                  <p className="text-yellow-400 text-sm font-semibold uppercase tracking-wide">Players ({players.length})</p>
+                </div>
+                <div className="p-4">
+                  {players.length === 0 ? (
+                    <p className="text-white/50 text-center py-4">Waiting for players...</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {players.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between p-3 bg-blue-700 rounded">
+                          <span className="text-white font-medium">{p.name || p.user?.name}</span>
+                          {!p.isActive && <Badge className="bg-white/20 text-white/60">Offline</Badge>}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
 
-          {roomId && roomCode && <RoomSettings roomId={roomId} roomCode={roomCode} isHost={true} />}
+              <Button
+                onClick={handleStartGame}
+                disabled={players.length < 1 || !roomCode}
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-blue-900 font-bold text-lg mt-4"
+                size="lg"
+              >
+                Start Game
+              </Button>
+            </div>
+          </div>
 
-          <Button onClick={handleStartGame} disabled={players.length < 1 || !roomCode} className="w-full" size="lg">
-            Start Game
-          </Button>
-
-          <div className="text-center">
-            <Button variant="link" onClick={() => setViewMode('join')} className="text-white">
+          <div className="text-center mt-4">
+            <Button variant="link" onClick={() => setViewMode('join')} className="text-white/70 hover:text-white">
               Join a game instead
             </Button>
           </div>
@@ -188,40 +189,45 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-blue-900 p-4">
       <div className="max-w-md mx-auto space-y-4">
-        <h1 className="text-4xl font-bold text-white text-center py-4">JPRTY!</h1>
+        <h1 className="text-4xl font-bold text-yellow-400 text-center py-4 uppercase tracking-wide">JPRTY!</h1>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Join a Game</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="bg-blue-800 rounded-lg overflow-hidden">
+          <div className="bg-blue-950 px-4 py-2">
+            <p className="text-yellow-400 text-sm font-semibold uppercase tracking-wide text-center">Join a Game</p>
+          </div>
+          <div className="p-6 space-y-4">
             <div className="space-y-2">
-              <Label>Your Name</Label>
+              <Label className="text-white/70">Your Name</Label>
               <Input
                 placeholder="Enter your name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 maxLength={20}
+                className="bg-blue-700 border-blue-600 text-white placeholder:text-white/40"
               />
             </div>
             <div className="space-y-2">
-              <Label>Room Code</Label>
+              <Label className="text-white/70">Room Code</Label>
               <Input
                 placeholder="ABCD"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 maxLength={4}
-                className="text-center text-2xl font-mono tracking-widest"
+                className="text-center text-2xl font-mono tracking-widest bg-blue-700 border-blue-600 text-white placeholder:text-white/40"
               />
             </div>
-            <Button onClick={handleJoin} disabled={!joinCode.trim() || !playerName.trim()} className="w-full">
+            <Button
+              onClick={handleJoin}
+              disabled={!joinCode.trim() || !playerName.trim()}
+              className="w-full bg-yellow-500 hover:bg-yellow-600 text-blue-900 font-bold"
+            >
               Join Room
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         <div className="text-center">
-          <Button variant="link" onClick={() => setViewMode('host')} className="text-white">
+          <Button variant="link" onClick={() => setViewMode('host')} className="text-white/70 hover:text-white">
             Host a game instead
           </Button>
         </div>

@@ -1,8 +1,9 @@
 import { Server, Socket } from 'socket.io';
 import { db } from '@jprty/db';
-import { GAME_EVENTS, GAME_CONFIG } from '@jprty/shared';
+import { GAME_EVENTS } from '@jprty/shared';
 import { roomManager } from '../game/rooms';
 import { gameState, GameState } from '../game/state';
+import { calculateMaxWager } from '../game/config';
 
 function broadcastState(io: Server, roomId: string, _state: GameState): void {
   const snapshot = gameState.getSnapshot(roomId);
@@ -12,7 +13,7 @@ function broadcastState(io: Server, roomId: string, _state: GameState): void {
     if (snapshot.board && snapshot.board.grid) {
       const answeredQuestions: string[] = [];
       snapshot.board.grid.forEach((cell) => {
-        if (cell.isAnswered) {
+        if (cell.isUsed) {
           const category = snapshot.board!.categories[cell.col];
           answeredQuestions.push(`${category}_${cell.value}`);
         }
@@ -76,10 +77,16 @@ export function game(io: Server, socket: Socket) {
 
       // Emit appropriate event based on whether it's a Daily Double
       if (state.phase === 'DAILY_DOUBLE') {
+        const playerScore = state.scores.get(connection.playerId) || 0;
+        const maxWager = calculateMaxWager(playerScore, state.roundType);
+
         io.to(connection.roomId).emit(GAME_EVENTS.DAILY_DOUBLE, {
           playerId: connection.playerId,
           questionId: data.questionId,
-          maxWager: state.scores.get(connection.playerId) || GAME_CONFIG.wager.lowScoreMaxWager.SINGLE_JEOPARDY,
+          maxWager,
+          question: state.currentQuestion,
+          value: state.currentQuestionValue,
+          category: state.currentQuestionCategory,
         });
       } else {
         io.to(connection.roomId).emit(GAME_EVENTS.QUESTION_SELECTED, {
