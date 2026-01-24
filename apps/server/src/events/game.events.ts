@@ -204,6 +204,7 @@ export function game(io: Server, socket: Socket) {
         pointChange: newScore - previousScore,
         newScore,
         phase: state.phase,
+        selectorPlayerId: state.selectorPlayerId,
       });
 
       // Handle phase transitions
@@ -213,7 +214,7 @@ export function game(io: Server, socket: Socket) {
           if (currentState) {
             broadcastState(io, connection.roomId, currentState);
           }
-        }, GAME_CONFIG.timing.revealDelay);
+        }, state.timing.revealWindowMs);
       } else if (state.phase === 'ROUND_END') {
         io.to(connection.roomId).emit(GAME_EVENTS.ROUND_END, {
           roundNumber: state.roundNumber,
@@ -281,7 +282,7 @@ export function game(io: Server, socket: Socket) {
       if (state.phase === 'FINAL_JEOPARDY_ANSWER') {
         io.to(connection.roomId).emit(GAME_EVENTS.FINAL_JEOPARDY_START, {
           question: state.finalJeopardyQuestion,
-          timeRemaining: GAME_CONFIG.timing.finalJeopardyAnswer / 1000,
+          timeRemaining: state.timing.finalJeopardyAnswerMs / 1000,
         });
       }
     } catch (error: any) {

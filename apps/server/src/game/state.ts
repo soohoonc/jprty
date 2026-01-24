@@ -39,6 +39,16 @@ export interface FinalJeopardyAnswer {
   revealed: boolean;
 }
 
+export interface TimingConfig {
+  buzzWindowMs: number;
+  answerWindowMs: number;
+  revealWindowMs: number;
+  readingDelayMs: number;
+  dailyDoubleWagerMs: number;
+  finalJeopardyWagerMs: number;
+  finalJeopardyAnswerMs: number;
+}
+
 export interface GameState {
   roomId: string;
   sessionId?: string;
@@ -58,6 +68,8 @@ export interface GameState {
   totalRounds: number;
   timeRemaining?: number;
   board?: GameBoard;
+  // Room-specific timing configuration
+  timing: TimingConfig;
   // Daily Double specific
   currentWager?: number;
   // Final Jeopardy specific
@@ -110,6 +122,16 @@ class GameStateManager {
       scores: new Map(),
       roundNumber: 0,
       totalRounds,
+      // Default timing from GAME_CONFIG, will be overwritten by room config on start
+      timing: {
+        buzzWindowMs: GAME_CONFIG.timing.buzzWindow,
+        answerWindowMs: GAME_CONFIG.timing.answerWindow,
+        revealWindowMs: GAME_CONFIG.timing.revealDelay,
+        readingDelayMs: GAME_CONFIG.timing.readingDelay,
+        dailyDoubleWagerMs: GAME_CONFIG.timing.dailyDoubleWager,
+        finalJeopardyWagerMs: GAME_CONFIG.timing.finalJeopardyWager,
+        finalJeopardyAnswerMs: GAME_CONFIG.timing.finalJeopardyAnswer,
+      },
     };
     this.games.set(roomId, state);
     return state;
@@ -178,6 +200,23 @@ class GameStateManager {
   async start(roomId: string, filter?: QuestionSetFilter): Promise<GameState> {
     const state = this.games.get(roomId);
     if (!state) throw new Error('Game not found');
+
+    // Load room configuration for timing settings
+    const roomConfig = await db.gameConfiguration.findUnique({
+      where: { roomId },
+    });
+    if (roomConfig) {
+      state.timing = {
+        buzzWindowMs: roomConfig.buzzWindowMs,
+        answerWindowMs: roomConfig.answerWindowMs,
+        revealWindowMs: roomConfig.revealWindowMs,
+        readingDelayMs: GAME_CONFIG.timing.readingDelay, // Not configurable yet
+        dailyDoubleWagerMs: GAME_CONFIG.timing.dailyDoubleWager, // Not configurable yet
+        finalJeopardyWagerMs: GAME_CONFIG.timing.finalJeopardyWager, // Not configurable yet
+        finalJeopardyAnswerMs: GAME_CONFIG.timing.finalJeopardyAnswer, // Not configurable yet
+      };
+      console.log('[GameState] Loaded room config:', state.timing);
+    }
 
     const session = await db.gameSession.create({
       data: {
@@ -272,14 +311,14 @@ class GameStateManager {
       this.setTimer(roomId, () => {
         // Auto-wager minimum if no wager submitted
         this.submitDailyDoubleWager(roomId, playerId, GAME_CONFIG.wager.minimumWager);
-      }, GAME_CONFIG.timing.dailyDoubleWager);
+      }, state.timing.dailyDoubleWagerMs);
     } else {
       state.phase = 'READING';
 
       // Timer to open buzzer after reading
       this.setTimer(roomId, () => {
         this.openBuzzer(roomId);
-      }, GAME_CONFIG.timing.readingDelay);
+      }, state.timing.readingDelayMs);
     }
 
     this.notifyChange(state);
@@ -302,13 +341,13 @@ class GameStateManager {
 
     state.currentWager = validWager;
     state.phase = 'DAILY_DOUBLE_ANSWER';
-    state.timeRemaining = GAME_CONFIG.timing.answerWindow;
+    state.timeRemaining = state.timing.answerWindowMs / 1000;
 
     this.clearTimer(roomId);
     this.setTimer(roomId, () => {
       // Timeout - treat as wrong answer
       this.submitAnswer(roomId, playerId, '', false);
-    }, GAME_CONFIG.timing.answerWindow);
+    }, state.timing.answerWindowMs);
 
     this.notifyChange(state);
     return state;
@@ -319,12 +358,12 @@ class GameStateManager {
     if (!state) throw new Error('Game not found');
 
     state.phase = 'BUZZING';
-    state.timeRemaining = GAME_CONFIG.timing.buzzWindow / 1000;
+    state.timeRemaining = state.timing.buzzWindowMs / 1000;
 
     this.setTimer(roomId, () => {
       // No one buzzed - reveal answer and move on
       this.revealAnswer(roomId);
-    }, GAME_CONFIG.timing.buzzWindow);
+    }, state.timing.buzzWindowMs);
 
     this.notifyChange(state);
     return state;
@@ -347,12 +386,12 @@ class GameStateManager {
     if (state.buzzQueue.length === 1) {
       state.currentPlayerId = playerId;
       state.phase = 'ANSWERING';
-      state.timeRemaining = GAME_CONFIG.timing.answerWindow / 1000;
+      state.timeRemaining = state.timing.answerWindowMs / 1000;
       this.clearTimer(roomId);
 
       this.setTimer(roomId, () => {
         this.handleTimeout(roomId);
-      }, GAME_CONFIG.timing.answerWindow);
+      }, state.timing.answerWindowMs);
     }
 
     this.notifyChange(state);
@@ -411,7 +450,7 @@ class GameStateManager {
       state.phase = 'REVEALING';
       this.setTimer(roomId, () => {
         this.afterReveal(roomId);
-      }, GAME_CONFIG.timing.revealDelay);
+      }, state.timing.revealWindowMs);
     } else {
       // Wrong answer in regular play
       this.clearTimer(roomId);
@@ -445,10 +484,10 @@ class GameStateManager {
     if (state.buzzQueue.length > 0) {
       state.currentPlayerId = state.buzzQueue[0];
       state.phase = 'ANSWERING';
-      state.timeRemaining = GAME_CONFIG.timing.answerWindow / 1000;
+      state.timeRemaining = state.timing.answerWindowMs / 1000;
       this.setTimer(roomId, () => {
         this.handleTimeout(roomId);
-      }, GAME_CONFIG.timing.answerWindow);
+      }, state.timing.answerWindowMs);
     } else {
       this.revealAnswer(roomId);
     }
@@ -467,7 +506,7 @@ class GameStateManager {
 
     this.setTimer(roomId, () => {
       this.afterReveal(roomId);
-    }, GAME_CONFIG.timing.revealDelay);
+    }, state.timing.revealWindowMs);
 
     this.notifyChange(state);
     return state;
@@ -591,7 +630,7 @@ class GameStateManager {
     // Timer for wagers
     this.setTimer(roomId, () => {
       this.startFinalJeopardyAnswering(roomId);
-    }, GAME_CONFIG.timing.finalJeopardyWager);
+    }, state.timing.finalJeopardyWagerMs);
   }
 
   submitFinalJeopardyWager(roomId: string, playerId: string, wager: number): GameState {
@@ -632,7 +671,7 @@ class GameStateManager {
     // Timer for answers
     this.setTimer(roomId, () => {
       this.revealFinalJeopardy(roomId);
-    }, GAME_CONFIG.timing.finalJeopardyAnswer);
+    }, state.timing.finalJeopardyAnswerMs);
   }
 
   submitFinalJeopardyAnswer(roomId: string, playerId: string, answer: string): GameState {

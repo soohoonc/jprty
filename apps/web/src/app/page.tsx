@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "@/lib/socket";
-import { useSocketInvalidation } from "@/lib/use-socket-invalidation";
 import { api } from "@/trpc/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,14 +38,13 @@ export default function Home() {
   const roomCode = createRoom.data?.code ?? null;
   const roomId = createRoom.data?.id ?? null;
 
+  const utils = api.useUtils();
+
   // Get room data from React Query (including players)
   const { data: room } = api.game.getRoom.useQuery(
     { roomCode: roomCode! },
     { enabled: !!roomCode }
   );
-
-  // Socket invalidation for player updates
-  useSocketInvalidation({ roomCode: roomCode || "", enabled: !!roomCode });
 
   // Players from React Query (excludes host)
   const players = room?.players?.filter((p) => !p.userId || p.userId !== room.hostId) || [];
@@ -74,19 +72,29 @@ export default function Home() {
     socketJoined.current = true;
     socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName: "Host", isHost: true });
 
-    socket.on(ROOM_EVENTS.PLAYER_JOINED, (data) => {
+    const handlePlayerJoined = (data: { player: { name?: string; guestName?: string } }) => {
       toast.info(`${data.player.name || data.player.guestName} joined`);
-    });
+      utils.game.getRoom.invalidate({ roomCode });
+    };
 
-    socket.on(ROOM_EVENTS.GAME_STARTED, () => {
+    const handlePlayerLeft = () => {
+      utils.game.getRoom.invalidate({ roomCode });
+    };
+
+    const handleGameStarted = () => {
       router.push(`/room/${roomCode}/host`);
-    });
+    };
+
+    socket.on(ROOM_EVENTS.PLAYER_JOINED, handlePlayerJoined);
+    socket.on(ROOM_EVENTS.PLAYER_LEFT, handlePlayerLeft);
+    socket.on(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
 
     return () => {
-      socket.off(ROOM_EVENTS.PLAYER_JOINED);
-      socket.off(ROOM_EVENTS.GAME_STARTED);
+      socket.off(ROOM_EVENTS.PLAYER_JOINED, handlePlayerJoined);
+      socket.off(ROOM_EVENTS.PLAYER_LEFT, handlePlayerLeft);
+      socket.off(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
     };
-  }, [socket, isConnected, roomCode, router]);
+  }, [socket, isConnected, roomCode, router, utils]);
 
   const handleJoin = () => {
     if (!joinCode.trim() || !playerName.trim()) {

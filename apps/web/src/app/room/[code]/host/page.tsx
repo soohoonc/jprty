@@ -6,9 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useSocket } from "@/lib/socket";
-import { useGameState } from "@/lib/use-game-state";
+import { useGameMachine } from "@/lib/use-game-machine";
 import { ROOM_EVENTS } from "@jprty/shared";
-import { Loader2 } from "lucide-react";
+import { Loader2, Star } from "lucide-react";
 
 export default function HostPage() {
   const params = useParams();
@@ -24,25 +24,31 @@ export default function HostPage() {
     hasJoinedRef.current = true;
 
     socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName: "Host", isHost: true });
-
-    // Request current game state after joining (handles refresh case)
     socket.emit(ROOM_EVENTS.GET_STATE, { isHost: true });
   }, [socket, isConnected, roomCode]);
 
   const {
-    gameBoard,
+    // Phase checks
+    isSelecting,
+    isBuzzing,
+    isAnswering,
+    isDailyDouble,
+    isDailyDoubleAnswer,
+    // Game data
+    board,
     currentQuestion,
-    gameStatus,
-    buzzedPlayer,
-    playerAnswer,
-    answeringPlayerName,
-    showAnswer,
-    correctAnswer,
-    isCorrect,
-    isLoading,
+    dailyDoublePlayerName,
+    // Buzzer state
+    buzzedPlayerName,
     timeRemaining,
     totalTime,
-  } = useGameState({
+    // Answer state
+    lastAnswer,
+    showAnswer,
+    correctAnswer,
+    // Loading
+    isLoading,
+  } = useGameMachine({
     roomCode,
     isHost: true,
     enabled: isConnected,
@@ -53,8 +59,7 @@ export default function HostPage() {
     onError: (message) => toast.error(message),
   });
 
-  // Loading state
-  if (isLoading || !gameBoard) {
+  if (isLoading || !board) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-blue-900 p-4">
         <div className="text-center space-y-4">
@@ -68,37 +73,30 @@ export default function HostPage() {
   return (
     <div className="min-h-screen bg-blue-900 p-4">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-4 flex justify-between items-center">
-          <Badge variant="outline" className="text-white border-white">
-            HOST
-          </Badge>
-          <Badge variant="secondary">{roomCode}</Badge>
+        <div className="mb-4 text-center">
+          <span className="text-white text-sm font-mono">{roomCode}</span>
         </div>
 
-        {/* Game Board - Display Only (no interaction) */}
-        {gameStatus === "SELECTING" && !currentQuestion && (
+        {/* Game Board - Display Only */}
+        {isSelecting && !currentQuestion && (
           <div className="grid grid-cols-6 gap-2">
-            {gameBoard.categories.map((category) => (
+            {board.categories.map((category) => (
               <div key={category} className="space-y-2">
                 <div className="bg-blue-800 text-white text-center p-2 text-xs font-semibold uppercase truncate">
                   {category}
                 </div>
                 {[200, 400, 600, 800, 1000].map((value) => {
                   const questionId = `${category}_${value}`;
-                  const isAnswered = gameBoard.answeredQuestions?.has(questionId);
+                  const isAnswered = board.answeredQuestions?.has(questionId);
 
                   return (
                     <div
                       key={questionId}
                       className={`w-full h-16 flex items-center justify-center text-xl font-bold ${
-                        isAnswered
-                          ? "bg-blue-950 opacity-30"
-                          : "bg-blue-700"
+                        isAnswered ? "bg-blue-950 opacity-30" : "bg-blue-700"
                       }`}
                     >
-                      {!isAnswered && (
-                        <span className="text-yellow-400">${value}</span>
-                      )}
+                      {!isAnswered && <span className="text-yellow-400">${value}</span>}
                     </div>
                   );
                 })}
@@ -107,8 +105,84 @@ export default function HostPage() {
           </div>
         )}
 
-        {/* Question Display */}
-        {currentQuestion && (
+        {/* Daily Double Display */}
+        {isDailyDouble && currentQuestion && (
+          <Card className="bg-blue-800 border-none overflow-hidden">
+            <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-6 flex items-center justify-center gap-4">
+              <Star className="h-10 w-10 text-blue-900 fill-blue-900" />
+              <span className="text-blue-900 font-bold text-4xl uppercase tracking-wide">Daily Double!</span>
+              <Star className="h-10 w-10 text-blue-900 fill-blue-900" />
+            </div>
+            <CardContent className="p-8 text-center text-white">
+              <div className="mb-4">
+                <Badge className="bg-blue-950 text-yellow-400">
+                  {currentQuestion.category}
+                </Badge>
+              </div>
+              <p className="text-2xl text-yellow-400 mb-4">
+                {dailyDoublePlayerName} is wagering...
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Daily Double Answer Display */}
+        {isDailyDoubleAnswer && currentQuestion && (
+          <Card className="bg-blue-800 border-none overflow-hidden">
+            <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-4 flex items-center justify-center gap-3">
+              <Star className="h-6 w-6 text-blue-900 fill-blue-900" />
+              <span className="text-blue-900 font-bold text-2xl uppercase tracking-wide">Daily Double</span>
+              <Star className="h-6 w-6 text-blue-900 fill-blue-900" />
+            </div>
+            <CardContent className="p-8 text-center text-white">
+              <div className="mb-4">
+                <Badge className="bg-yellow-500 text-black">
+                  {currentQuestion.category} - ${currentQuestion.value}
+                </Badge>
+              </div>
+              <p className="text-2xl mb-8">{currentQuestion.clue}</p>
+              <div className="space-y-3">
+                <p className="text-green-400 text-xl">{dailyDoublePlayerName} is answering...</p>
+                {timeRemaining !== null && totalTime !== null && (
+                  <div className="w-full max-w-md mx-auto">
+                    <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-400 transition-all duration-1000 ease-linear"
+                        style={{ width: `${(timeRemaining / totalTime) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-green-400/70 text-sm mt-1">{timeRemaining}s to answer</p>
+                  </div>
+                )}
+              </div>
+              {lastAnswer?.answer && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-white text-lg">
+                    {lastAnswer.playerName || "Player"} answered:
+                  </p>
+                  <p className="text-2xl font-bold">&quot;{lastAnswer.answer}&quot;</p>
+                  <p
+                    className={`text-3xl font-bold ${lastAnswer.isCorrect ? "text-green-400" : "text-red-400"}`}
+                  >
+                    {lastAnswer.isCorrect ? "CORRECT!" : "WRONG!"}
+                  </p>
+                </div>
+              )}
+              {showAnswer && (
+                <div className="mt-6 pt-6 border-t border-blue-600">
+                  <p className="text-gray-400 text-sm">Correct answer:</p>
+                  <p className="text-green-400 text-xl">{correctAnswer}</p>
+                  <div className="mt-6 text-white/50 text-sm">
+                    Waiting for player to select next question...
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Question Display (Regular flow) */}
+        {currentQuestion && !isDailyDouble && !isDailyDoubleAnswer && (
           <Card className="bg-blue-800 border-none">
             <CardContent className="p-8 text-center text-white">
               <div className="mb-4">
@@ -119,10 +193,9 @@ export default function HostPage() {
 
               <p className="text-2xl mb-8">{currentQuestion.clue}</p>
 
-              {gameStatus === "BUZZING" && (
+              {isBuzzing && (
                 <div className="space-y-3">
                   <p className="text-yellow-400 text-xl">BUZZER OPEN</p>
-                  {/* Buzz countdown bar */}
                   {timeRemaining !== null && totalTime !== null && (
                     <div className="w-full max-w-md mx-auto">
                       <div className="h-2 bg-white/20 rounded-full overflow-hidden">
@@ -137,11 +210,10 @@ export default function HostPage() {
                 </div>
               )}
 
-              {buzzedPlayer && !playerAnswer && (
+              {buzzedPlayerName && !lastAnswer?.answer && (
                 <div className="space-y-3">
-                  <p className="text-green-400 text-xl">{buzzedPlayer} buzzed!</p>
-                  {/* Answer countdown bar */}
-                  {timeRemaining !== null && totalTime !== null && gameStatus === "ANSWERING" && (
+                  <p className="text-green-400 text-xl">{buzzedPlayerName} buzzed!</p>
+                  {timeRemaining !== null && totalTime !== null && isAnswering && (
                     <div className="w-full max-w-md mx-auto">
                       <div className="h-2 bg-white/20 rounded-full overflow-hidden">
                         <div
@@ -155,14 +227,16 @@ export default function HostPage() {
                 </div>
               )}
 
-              {playerAnswer && (
+              {lastAnswer?.answer && (
                 <div className="mt-4 space-y-2">
                   <p className="text-white text-lg">
-                    {answeringPlayerName || "Player"} answered:
+                    {lastAnswer.playerName || "Player"} answered:
                   </p>
-                  <p className="text-2xl font-bold">&quot;{playerAnswer}&quot;</p>
-                  <p className={`text-3xl font-bold ${isCorrect ? "text-green-400" : "text-red-400"}`}>
-                    {isCorrect ? "CORRECT!" : "WRONG!"}
+                  <p className="text-2xl font-bold">&quot;{lastAnswer.answer}&quot;</p>
+                  <p
+                    className={`text-3xl font-bold ${lastAnswer.isCorrect ? "text-green-400" : "text-red-400"}`}
+                  >
+                    {lastAnswer.isCorrect ? "CORRECT!" : "WRONG!"}
                   </p>
                 </div>
               )}
@@ -171,8 +245,6 @@ export default function HostPage() {
                 <div className="mt-6 pt-6 border-t border-blue-600">
                   <p className="text-gray-400 text-sm">Correct answer:</p>
                   <p className="text-green-400 text-xl">{correctAnswer}</p>
-
-                  {/* Waiting for player to advance indicator */}
                   <div className="mt-6 text-white/50 text-sm">
                     Waiting for player to select next question...
                   </div>

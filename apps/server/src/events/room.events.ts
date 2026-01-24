@@ -242,6 +242,8 @@ export function room(io: Server, socket: Socket) {
           currentPlayerId: newState.currentPlayerId,
           selectorPlayerId: newState.selectorPlayerId,
           timeRemaining: newState.timeRemaining,
+          // Include correct answer when revealing
+          correctAnswer: newState.phase === 'REVEALING' ? newState.currentQuestion?.answer : undefined,
         });
       });
 
@@ -317,6 +319,8 @@ export function room(io: Server, socket: Socket) {
             currentPlayerId: newState.currentPlayerId,
             selectorPlayerId: newState.selectorPlayerId,
             timeRemaining: newState.timeRemaining,
+            // Include correct answer when revealing
+            correctAnswer: newState.phase === 'REVEALING' ? newState.currentQuestion?.answer : undefined,
           });
         });
       }

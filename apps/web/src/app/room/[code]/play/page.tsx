@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { CountdownButton } from "@/components/ui/countdown-button";
+import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { useSocket } from "@/lib/socket";
-import { useGameState } from "@/lib/use-game-state";
+import { useGameMachine } from "@/lib/use-game-machine";
 import { ROOM_EVENTS } from "@jprty/shared";
-import { ChevronLeft, ChevronRight, Loader2, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Star } from "lucide-react";
 
 export default function PlayerPage() {
   const params = useParams();
@@ -21,395 +22,366 @@ export default function PlayerPage() {
 
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [playerAnswer, setPlayerAnswer] = useState("");
-  const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
-
-  // Next question countdown (Netflix-style) for player who answered correctly
-  const AUTO_ADVANCE_SECONDS = 8;
-  const [nextQuestionCountdown, setNextQuestionCountdown] = useState<number | null>(null);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const [categoryIdx, setCategoryIdx] = useState(0);
+  const [wagerAmount, setWagerAmount] = useState(5);
 
   // Get playerId on mount
   useEffect(() => {
     setPlayerId(localStorage.getItem("playerId"));
   }, []);
 
-  // Join room as player when socket connects
+  // Join room
   useEffect(() => {
-    if (!socket || !isConnected) return;
-    if (hasJoinedRef.current) return;
+    if (!socket || !isConnected || hasJoinedRef.current) return;
     hasJoinedRef.current = true;
 
     const playerName = localStorage.getItem("playerName") || "Guest";
     socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName });
 
-    // Handle JOINED response to update playerId (in case it changed)
     const handleJoined = (data: { player: { id: string } }) => {
       localStorage.setItem("playerId", data.player.id);
       setPlayerId(data.player.id);
     };
 
     socket.on(ROOM_EVENTS.JOINED, handleJoined);
+    socket.emit(ROOM_EVENTS.GET_STATE, { playerId: localStorage.getItem("playerId"), isHost: false });
 
-    // Request current game state after joining (handles refresh case)
-    const storedPlayerId = localStorage.getItem("playerId");
-    socket.emit(ROOM_EVENTS.GET_STATE, { playerId: storedPlayerId, isHost: false });
-
-    return () => {
-      socket.off(ROOM_EVENTS.JOINED, handleJoined);
-    };
+    return () => { socket.off(ROOM_EVENTS.JOINED, handleJoined); };
   }, [socket, isConnected, roomCode]);
 
   const {
-    gameBoard,
-    currentQuestion,
-    gameStatus,
-    buzzedPlayer,
-    canBuzz,
-    isMyTurn,
-    answerResult,
-    isSelector,
+    phase, isSelecting, isReading, isBuzzing, isAnswering, isRevealing,
+    isDailyDouble, isDailyDoubleAnswer, isDailyDoublePlayer, dailyDoublePlayerName,
+    isMyTurn, isSelector, selectorPlayerName, canBuzz,
+    board, currentQuestion, buzzedPlayerName, timeRemaining, totalTime,
+    lastAnswer, correctAnswer, myScore, maxWager,
     isLoading,
-    timeRemaining,
-    totalTime,
-    showAnswer,
-    correctAnswer,
-    selectQuestion,
-    buzz,
-    submitAnswer,
-    nextQuestion,
-  } = useGameState({
+    selectQuestion, buzz, submitAnswer, submitWager, nextQuestion,
+  } = useGameMachine({
     roomCode,
     playerId,
     enabled: !!playerId && isConnected,
-    onGameEnd: () => {
-      toast.success("Game Over!");
-      router.push(`/room/${roomCode}/results`);
-    },
-    onError: (message) => toast.error(message),
+    onGameEnd: () => { toast.success("Game Over!"); router.push(`/room/${roomCode}/results`); },
+    onError: (msg) => toast.error(msg),
   });
 
-  const handleBuzz = () => {
-    buzz();
-  };
-
-  const handleNextQuestion = useCallback(() => {
-    nextQuestion();
-    setNextQuestionCountdown(null);
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-  }, [nextQuestion]);
-
-  // Start countdown when answer is revealed (REVEALING phase) and this player is the selector
-  // Don't start if others can still buzz in
+  // Show result toast
   useEffect(() => {
-    if (showAnswer && isSelector && gameStatus === "REVEALING" && nextQuestionCountdown === null) {
-      setNextQuestionCountdown(AUTO_ADVANCE_SECONDS);
+    if (lastAnswer?.playerId === playerId) {
+      toast[lastAnswer.isCorrect ? "success" : "error"](
+        `${lastAnswer.isCorrect ? "Correct" : "Wrong"}! ${lastAnswer.isCorrect ? "+" : ""}${lastAnswer.pointChange}`
+      );
     }
-  }, [showAnswer, isSelector, gameStatus, nextQuestionCountdown]);
+  }, [lastAnswer, playerId]);
 
-  // Countdown timer for next question
-  useEffect(() => {
-    if (nextQuestionCountdown === null || nextQuestionCountdown <= 0) return;
+  const handleSubmit = () => { submitAnswer(playerAnswer); setPlayerAnswer(""); };
 
-    countdownRef.current = setInterval(() => {
-      setNextQuestionCountdown((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(countdownRef.current!);
-          countdownRef.current = null;
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current);
-      }
-    };
-  }, [nextQuestionCountdown]);
-
-  // Auto-advance when countdown reaches 0
-  useEffect(() => {
-    if (nextQuestionCountdown === 0) {
-      handleNextQuestion();
-    }
-  }, [nextQuestionCountdown, handleNextQuestion]);
-
-  // Reset countdown when moving to next question (SELECTING phase)
-  useEffect(() => {
-    if (gameStatus === "SELECTING") {
-      setNextQuestionCountdown(null);
-    }
-  }, [gameStatus]);
-
-  const handleSubmitAnswer = () => {
-    submitAnswer(playerAnswer);
-    setPlayerAnswer("");
-  };
-
-  const handleSelectQuestion = (questionId: string) => {
-    selectQuestion(questionId);
-  };
-
-  // Show result toast when answer result comes in for this player
-  useEffect(() => {
-    if (answerResult?.playerId === playerId) {
-      if (answerResult.isCorrect) {
-        toast.success(`Correct! +${answerResult.pointChange}`);
-      } else {
-        toast.error(`Wrong! ${answerResult.pointChange}`);
-      }
-    }
-  }, [answerResult, playerId]);
-
-  // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-blue-900 p-4">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-white mx-auto" />
-          <p className="text-white/70">Loading game...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-blue-900 p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-yellow-400" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-blue-900 p-4">
+    <div className="min-h-screen bg-blue-900 p-4 pb-20">
       <div className="max-w-2xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
-          <span className="text-white text-sm font-mono">{roomCode}</span>
-          <span className="text-white/40 text-xs uppercase tracking-wide">
-            {gameStatus.replace("_", " ")}
-          </span>
+        <div className="mb-6">
+          <span className="text-white/60 text-xs font-mono tracking-widest">{roomCode}</span>
         </div>
 
-        {/* Selector View - Show one category at a time */}
-        {gameStatus === "SELECTING" && isSelector && gameBoard && !currentQuestion && (
+        {/* Category Picker (Selector only) */}
+        {isSelecting && isSelector && board && !currentQuestion && (
           <div className="space-y-4">
-            {/* Category Navigation */}
             <div className="flex items-center justify-between gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setCurrentCategoryIndex((prev) =>
-                  prev > 0 ? prev - 1 : gameBoard.categories.length - 1
-                )}
-                className="text-white hover:bg-white/10"
-              >
+              <Button variant="ghost" size="icon" onClick={() => setCategoryIdx((i) => (i > 0 ? i - 1 : board.categories.length - 1))} className="text-white hover:bg-white/10">
                 <ChevronLeft className="h-8 w-8" />
               </Button>
-
-              <div className="flex-1 text-center">
-                <p className="text-white/50 text-sm mb-1">
-                  {currentCategoryIndex + 1} of {gameBoard.categories.length}
-                </p>
-              </div>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setCurrentCategoryIndex((prev) =>
-                  prev < gameBoard.categories.length - 1 ? prev + 1 : 0
-                )}
-                className="text-white hover:bg-white/10"
-              >
+              <p className="text-white/50 text-sm">{categoryIdx + 1} of {board.categories.length}</p>
+              <Button variant="ghost" size="icon" onClick={() => setCategoryIdx((i) => (i < board.categories.length - 1 ? i + 1 : 0))} className="text-white hover:bg-white/10">
                 <ChevronRight className="h-8 w-8" />
               </Button>
             </div>
 
-            {/* Single Category Column */}
             <div className="space-y-2">
               <div className="bg-blue-800 text-white text-center p-4 text-lg font-semibold uppercase">
-                {gameBoard.categories[currentCategoryIndex]}
+                {board.categories[categoryIdx]}
               </div>
               {[200, 400, 600, 800, 1000].map((value) => {
-                const category = gameBoard.categories[currentCategoryIndex];
-                const questionId = `${category}_${value}`;
-                const isAnswered = gameBoard.answeredQuestions?.has(questionId);
-
+                const qid = `${board.categories[categoryIdx]}_${value}`;
+                const answered = board.answeredQuestions?.has(qid);
                 return (
                   <button
-                    key={questionId}
-                    disabled={isAnswered}
-                    onClick={() => handleSelectQuestion(questionId)}
+                    key={qid}
+                    disabled={answered}
+                    onClick={() => selectQuestion(qid)}
                     className={`w-full h-16 flex items-center justify-center text-2xl font-bold text-yellow-400 rounded-lg transition-all ${
-                      isAnswered
-                        ? "bg-blue-950 cursor-not-allowed opacity-30"
-                        : "bg-blue-700 hover:bg-blue-600 active:scale-95 cursor-pointer"
+                      answered ? "bg-blue-950 cursor-not-allowed opacity-30" : "bg-blue-700 hover:bg-blue-600 active:scale-95"
                     }`}
                   >
-                    {!isAnswered && `$${value}`}
+                    {!answered && `$${value}`}
                   </button>
                 );
               })}
             </div>
 
-            {/* Category dots indicator */}
             <div className="flex justify-center gap-2 pt-2">
-              {gameBoard.categories.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentCategoryIndex(idx)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    idx === currentCategoryIndex ? "bg-yellow-400 w-4" : "bg-white/30"
-                  }`}
-                />
+              {board.categories.map((_, i) => (
+                <button key={i} onClick={() => setCategoryIdx(i)} className={`w-2 h-2 rounded-full transition-all ${i === categoryIdx ? "bg-yellow-400 w-4" : "bg-white/30"}`} />
               ))}
             </div>
           </div>
         )}
 
-        {/* Waiting State - Not selector */}
-        {gameStatus === "SELECTING" && !isSelector && !currentQuestion && (
-          <div className="flex items-center justify-center py-20">
-            <p className="text-white/40 text-sm">Waiting for question selection</p>
-          </div>
+        {/* Waiting states */}
+        {isSelecting && !isSelector && !currentQuestion && (
+          <Card className="bg-blue-800 border-none shadow-lg">
+            <CardContent className="p-8 text-center space-y-3">
+              <p className="text-yellow-400 font-bold text-2xl">
+                {selectorPlayerName || "Player"} is choosing
+              </p>
+              <p className="text-white/50">Get ready to buzz!</p>
+            </CardContent>
+          </Card>
+        )}
+        {phase === "WAITING" && !currentQuestion && (
+          <Card className="bg-blue-800 border-none shadow-lg">
+            <CardContent className="p-8 text-center space-y-3">
+              <p className="text-yellow-400 font-bold text-2xl">
+                Waiting for Host
+              </p>
+              <p className="text-white/50">The game will begin shortly</p>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Waiting State - Initial */}
-        {gameStatus === "WAITING" && !currentQuestion && (
-          <div className="flex items-center justify-center py-20">
-            <p className="text-white/40 text-sm">Waiting for game to start</p>
-          </div>
-        )}
-
-        {/* Question Display */}
-        {currentQuestion && (
-          <Card>
+        {/* Daily Double - Wager Phase */}
+        {isDailyDouble && (
+          <Card className="bg-blue-800 border-none shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-4 flex items-center justify-center gap-3">
+              <Star className="h-8 w-8 text-blue-900 fill-blue-900" />
+              <span className="text-blue-900 font-bold text-2xl uppercase tracking-wide">Daily Double!</span>
+              <Star className="h-8 w-8 text-blue-900 fill-blue-900" />
+            </div>
             <CardContent className="p-6 space-y-6">
-              <div className="text-center">
-                <Badge>
-                  {currentQuestion.category} - ${currentQuestion.value}
-                </Badge>
-              </div>
+              {currentQuestion && (
+                <div className="text-center">
+                  <span className="inline-block bg-blue-950 text-yellow-400 font-bold px-4 py-1 rounded text-sm uppercase tracking-wide">
+                    {currentQuestion.category}
+                  </span>
+                </div>
+              )}
 
-              <p className="text-xl text-center">{currentQuestion.clue}</p>
-
-              {/* Buzzer */}
-              {gameStatus === "BUZZING" && canBuzz && (
-                <div className="space-y-3">
-                  <Button
-                    onClick={handleBuzz}
-                    size="lg"
-                    className="w-full bg-red-600 hover:bg-red-500 text-xl py-8"
-                  >
-                    BUZZ
-                  </Button>
-                  {/* Buzz countdown bar */}
-                  {timeRemaining !== null && totalTime !== null && (
-                    <div className="w-full">
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-red-400 transition-all duration-1000 ease-linear"
-                          style={{ width: `${(timeRemaining / totalTime) * 100}%` }}
-                        />
-                      </div>
-                      <p className="text-red-600/70 text-sm mt-1 text-center">{timeRemaining}s</p>
+              {isDailyDoublePlayer ? (
+                <div className="space-y-6">
+                  <p className="text-white text-center text-lg">Enter your wager:</p>
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <span className="text-yellow-400 text-4xl font-bold">${wagerAmount}</span>
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* Reading */}
-              {gameStatus === "READING" && (
-                <p className="text-center text-muted-foreground">
-                  Get ready to buzz...
-                </p>
-              )}
-
-              {/* Someone else buzzed */}
-              {buzzedPlayer && !isMyTurn && gameStatus === "ANSWERING" && (
-                <p className="text-center">{buzzedPlayer} is answering...</p>
-              )}
-
-              {/* Answer Input */}
-              {isMyTurn && gameStatus === "ANSWERING" && (
-                <div className="space-y-4">
-                  <p className="text-center text-green-600 font-medium">
-                    You buzzed! Answer:
-                  </p>
-                  {/* Answer countdown bar */}
-                  {timeRemaining !== null && totalTime !== null && (
-                    <div className="w-full">
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-green-500 transition-all duration-1000 ease-linear"
-                          style={{ width: `${(timeRemaining / totalTime) * 100}%` }}
-                        />
-                      </div>
-                      <p className="text-green-600/70 text-sm mt-1 text-center">{timeRemaining}s</p>
+                    <Slider
+                      value={[wagerAmount]}
+                      onValueChange={(v) => setWagerAmount(v[0]!)}
+                      min={5}
+                      max={maxWager || 1000}
+                      step={5}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-white/60 text-sm">
+                      <span>$5</span>
+                      <span>${maxWager || 1000}</span>
                     </div>
-                  )}
-                  <Input
-                    value={playerAnswer}
-                    onChange={(e) => setPlayerAnswer(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSubmitAnswer()}
-                    placeholder="Your answer..."
-                    autoFocus
-                  />
+                  </div>
                   <Button
-                    onClick={handleSubmitAnswer}
-                    className="w-full"
-                    disabled={!playerAnswer.trim()}
+                    onClick={() => submitWager(wagerAmount)}
+                    className="w-full bg-yellow-500 hover:bg-yellow-400 text-blue-900 font-bold py-6 text-xl"
                   >
-                    Submit
+                    Wager ${wagerAmount}
                   </Button>
                 </div>
-              )}
-
-              {/* Brief feedback for the answering player only */}
-              {answerResult && answerResult.playerId === playerId && (
-                <div
-                  className={`text-center p-4 rounded ${
-                    answerResult.isCorrect ? "bg-green-100" : "bg-red-100"
-                  }`}
-                >
-                  <p className="font-bold">
-                    {answerResult.isCorrect ? "CORRECT" : "WRONG"}
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-yellow-400 font-bold text-2xl mb-2">
+                    {dailyDoublePlayerName} hit a Daily Double!
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    {answerResult.isCorrect ? "+" : ""}{answerResult.pointChange} points
-                  </p>
-                </div>
-              )}
-
-              {/* Netflix-style Next Question button for selector (whoever picks next) */}
-              {/* Only show when in REVEALING phase - not while others can still buzz */}
-              {showAnswer && isSelector && gameStatus === "REVEALING" && (
-                <div className="mt-4 p-4 bg-blue-50 rounded text-center">
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Correct answer: {correctAnswer}
-                  </p>
-                  <Button
-                    onClick={handleNextQuestion}
-                    className="relative overflow-hidden bg-blue-600 hover:bg-blue-500 text-white px-6 py-4"
-                  >
-                    {/* Progress bar background */}
-                    {nextQuestionCountdown !== null && nextQuestionCountdown > 0 && (
-                      <div
-                        className="absolute inset-0 bg-blue-400 transition-all duration-1000 ease-linear"
-                        style={{
-                          width: `${((AUTO_ADVANCE_SECONDS - nextQuestionCountdown) / AUTO_ADVANCE_SECONDS) * 100}%`,
-                        }}
-                      />
-                    )}
-                    <span className="relative flex items-center gap-2">
-                      Pick Next Question
-                      <ArrowRight className="h-4 w-4" />
-                      {nextQuestionCountdown !== null && nextQuestionCountdown > 0 && (
-                        <span className="text-sm opacity-70">({nextQuestionCountdown}s)</span>
-                      )}
-                    </span>
-                  </Button>
+                  <p className="text-white/60">Waiting for wager...</p>
                 </div>
               )}
             </CardContent>
           </Card>
         )}
+
+        {/* Daily Double - Answer Phase */}
+        {isDailyDoubleAnswer && (
+          <Card className="bg-blue-800 border-none shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-3 flex items-center justify-center gap-2">
+              <Star className="h-5 w-5 text-blue-900 fill-blue-900" />
+              <span className="text-blue-900 font-bold text-lg uppercase tracking-wide">Daily Double</span>
+              <Star className="h-5 w-5 text-blue-900 fill-blue-900" />
+            </div>
+            <CardContent className="p-6 space-y-6">
+              {currentQuestion && (
+                <>
+                  <div className="text-center">
+                    <span className="inline-block bg-yellow-500 text-blue-900 font-bold px-4 py-1 rounded text-sm uppercase tracking-wide">
+                      {currentQuestion.category} - ${currentQuestion.value}
+                    </span>
+                  </div>
+                  <p className="text-xl text-center text-white leading-relaxed">{currentQuestion.clue}</p>
+                </>
+              )}
+
+              {isDailyDoublePlayer ? (
+                <div className="space-y-4">
+                  <p className="text-center text-yellow-400 font-bold text-lg">Your answer:</p>
+                  <Input
+                    value={playerAnswer}
+                    onChange={(e) => setPlayerAnswer(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                    placeholder="What is..."
+                    autoFocus
+                    className="bg-blue-950 border-blue-600 text-white placeholder:text-white/40 text-lg py-6"
+                  />
+                  <CountdownButton
+                    onClick={handleSubmit}
+                    timeRemaining={timeRemaining ?? 0}
+                    totalTime={totalTime ?? 1}
+                    progressColor="bg-yellow-400"
+                    className="w-full bg-yellow-500 hover:bg-yellow-400 text-blue-900 font-bold py-4"
+                  >
+                    Submit
+                  </CountdownButton>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-yellow-400 font-medium">
+                    {dailyDoublePlayerName} is answering...
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Question Display (Regular flow - not Daily Double) */}
+        {currentQuestion && !isDailyDouble && !isDailyDoubleAnswer && (
+          <Card className="bg-blue-800 border-none shadow-lg">
+            <CardContent className="p-6 space-y-6">
+              <div className="text-center">
+                <span className="inline-block bg-yellow-500 text-blue-900 font-bold px-4 py-1 rounded text-sm uppercase tracking-wide">
+                  {currentQuestion.category} - ${currentQuestion.value}
+                </span>
+              </div>
+
+              <p className="text-xl text-center text-white leading-relaxed">{currentQuestion.clue}</p>
+
+              {/* Buzzer */}
+              {isBuzzing && canBuzz && (
+                <CountdownButton
+                  onClick={buzz}
+                  timeRemaining={timeRemaining ?? 0}
+                  totalTime={totalTime ?? 1}
+                  progressColor="bg-red-400"
+                  className="w-full bg-red-600 hover:bg-red-500 text-white text-xl py-8 font-bold"
+                >
+                  BUZZ
+                </CountdownButton>
+              )}
+
+              {isReading && <p className="text-center text-white/60">Get ready to buzz...</p>}
+
+              {buzzedPlayerName && !isMyTurn && isAnswering && (
+                <p className="text-center text-yellow-400 font-medium">{buzzedPlayerName} is answering...</p>
+              )}
+
+              {/* Answer Input */}
+              {isMyTurn && isAnswering && (
+                <div className="space-y-4">
+                  <p className="text-center text-yellow-400 font-bold text-lg">You buzzed! Answer:</p>
+                  <Input
+                    value={playerAnswer}
+                    onChange={(e) => setPlayerAnswer(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                    placeholder="What is..."
+                    autoFocus
+                    className="bg-blue-950 border-blue-600 text-white placeholder:text-white/40 text-lg py-6"
+                  />
+                  <CountdownButton
+                    onClick={handleSubmit}
+                    timeRemaining={timeRemaining ?? 0}
+                    totalTime={totalTime ?? 1}
+                    progressColor="bg-yellow-400"
+                    className="w-full bg-yellow-500 hover:bg-yellow-400 text-blue-900 font-bold py-4"
+                  >
+                    Submit
+                  </CountdownButton>
+                </div>
+              )}
+
+              {/* Result feedback - personalized per player */}
+              {isRevealing && lastAnswer && lastAnswer.playerId === playerId && (
+                <div className={`text-center p-6 rounded-lg ${lastAnswer.isCorrect ? "bg-green-500/20 border-2 border-green-400" : "bg-red-500/20 border-2 border-red-400"}`}>
+                  <p className={`font-bold text-3xl mb-2 ${lastAnswer.isCorrect ? "text-green-400" : "text-red-400"}`}>
+                    {lastAnswer.isCorrect ? "CORRECT!" : "WRONG!"}
+                  </p>
+                  <p className="text-white/80 mb-3">You answered: &quot;{lastAnswer.answer}&quot;</p>
+                  {!lastAnswer.isCorrect && correctAnswer && (
+                    <div className="pt-3 border-t border-white/20">
+                      <p className="text-sm text-white/60 uppercase tracking-wide">Correct answer</p>
+                      <p className="text-xl font-bold text-yellow-400 mt-1">{correctAnswer}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* For other players - just show the correct answer */}
+              {isRevealing && lastAnswer && lastAnswer.playerId !== playerId && (
+                <div className="text-center p-6 rounded-lg bg-blue-950 border-2 border-yellow-500/50">
+                  <p className="text-sm text-white/60 uppercase tracking-wide">Correct answer</p>
+                  <p className="text-xl font-bold text-yellow-400 mt-1">{correctAnswer}</p>
+                </div>
+              )}
+
+              {/* Reveal answer when no one answered (timeout) */}
+              {isRevealing && !lastAnswer && (
+                <div className="text-center p-6 rounded-lg bg-blue-950 border-2 border-yellow-500/50">
+                  <p className="font-bold text-2xl mb-3 text-white/60">Time&apos;s Up!</p>
+                  {correctAnswer && (
+                    <>
+                      <p className="text-sm text-white/60 uppercase tracking-wide">Correct answer</p>
+                      <p className="text-xl font-bold text-yellow-400 mt-1">{correctAnswer}</p>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Next Question button - only for selector */}
+              {isRevealing && isSelector && (
+                <div className="mt-4 text-center">
+                  <CountdownButton
+                    onClick={nextQuestion}
+                    seconds={8}
+                    progressColor="bg-yellow-400"
+                    className="bg-yellow-500 hover:bg-yellow-400 text-blue-900 font-bold px-8 py-4"
+                  >
+                    Pick Next Question
+                  </CountdownButton>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Score Footer */}
+      <div className="fixed bottom-0 left-0 right-0 bg-blue-950/95 backdrop-blur border-t border-yellow-500/20 py-4">
+        <div className="text-center">
+          <p className="text-white/40 text-xs uppercase tracking-widest mb-1">Your Score</p>
+          <span className={`text-3xl font-bold ${myScore >= 0 ? "text-yellow-400" : "text-red-400"}`}>
+            {myScore < 0 ? "-" : ""}${Math.abs(myScore).toLocaleString()}
+          </span>
+        </div>
       </div>
     </div>
   );

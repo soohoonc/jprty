@@ -155,12 +155,6 @@ interface RoomSettingsProps {
   isHost: boolean;
 }
 
-const DIFFICULTY_OPTIONS = [
-  { value: "EASY", label: "Easy" },
-  { value: "MEDIUM", label: "Medium" },
-  { value: "HARD", label: "Hard" },
-];
-
 export function RoomSettings({ roomId, roomCode, isHost }: RoomSettingsProps) {
   const utils = api.useUtils();
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -175,7 +169,6 @@ export function RoomSettings({ roomId, roomCode, isHost }: RoomSettingsProps) {
   const config = room?.configuration;
 
   // Use server state directly - NumberInput handles its own local state for immediate feedback
-  const difficulty = config?.difficulty ?? "MEDIUM";
   const buzzWindowMs = config?.buzzWindowMs ?? 5000;
   const answerWindowMs = config?.answerWindowMs ?? 30000;
   const roundCount = config?.roundCount ?? 1;
@@ -217,10 +210,6 @@ export function RoomSettings({ roomId, roomCode, isHost }: RoomSettingsProps) {
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Difficulty</span>
-            <span>{difficulty}</span>
-          </div>
-          <div className="flex justify-between">
             <span className="text-muted-foreground">Buzz Window</span>
             <span>{buzzWindowMs / 1000}s</span>
           </div>
@@ -248,27 +237,6 @@ export function RoomSettings({ roomId, roomCode, isHost }: RoomSettingsProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Difficulty */}
-        <div className="space-y-2">
-          <Label>Difficulty</Label>
-          <div className="flex gap-2">
-            {DIFFICULTY_OPTIONS.map((option) => (
-              <Button
-                key={option.value}
-                variant={difficulty === option.value ? "default" : "outline"}
-                size="sm"
-                onClick={() =>
-                  debouncedUpdate({
-                    difficulty: option.value as "EASY" | "MEDIUM" | "HARD",
-                  })
-                }
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-
         {/* Buzz Window */}
         <div className="space-y-2">
           <Label>Buzz Window</Label>

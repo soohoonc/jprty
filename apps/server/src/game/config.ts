@@ -22,7 +22,7 @@ export const GAME_CONFIG = {
     readingDelay: 3000,      // Time to read question before buzzer opens
     buzzWindow: 5000,        // Time players have to buzz in
     answerWindow: 15000,     // Time to answer after buzzing
-    revealDelay: 3000,       // Time showing answer before next question
+    revealDelay: 8000,       // Time showing answer before next question
     dailyDoubleWager: 10000, // Time to place Daily Double wager
     finalJeopardyWager: 30000, // Time to place Final Jeopardy wager
     finalJeopardyAnswer: 30000, // Time to write Final Jeopardy answer
