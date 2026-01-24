@@ -2,6 +2,9 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../index";
 import { TRPCError } from "@trpc/server";
 
+// biome-ignore lint: port 8080 is correct for local game server
+const GAME_SERVER_URL = process.env.GAME_SERVER_URL || "http://localhost:8080";
+
 export const gameRouter = createTRPCRouter({
   // Get questions for a specific question set
   getQuestions: publicProcedure
@@ -377,6 +380,64 @@ export const gameRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  // Get game results
+  getGameResults: publicProcedure
+    .input(z.object({
+      roomCode: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const room = await ctx.db.room.findUnique({
+        where: { code: input.roomCode.toUpperCase() },
+        include: {
+          players: {
+            orderBy: { score: 'desc' },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  image: true,
+                },
+              },
+            },
+          },
+          gameSessions: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+
+      if (!room) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Room not found',
+        });
+      }
+
+      const sortedPlayers = room.players.sort((a, b) => b.score - a.score);
+      const winner = sortedPlayers[0] || null;
+
+      return {
+        roomCode: room.code,
+        gameId: room.gameSessions[0]?.id || room.id,
+        winner: winner ? {
+          id: winner.id,
+          name: winner.name || winner.user?.name || 'Anonymous',
+          score: winner.score,
+          correctAnswers: 0, // TODO: track in DB
+          incorrectAnswers: 0,
+        } : null,
+        players: sortedPlayers.map(p => ({
+          id: p.id,
+          name: p.name || p.user?.name || 'Anonymous',
+          score: p.score,
+          correctAnswers: 0,
+          incorrectAnswers: 0,
+        })),
+      };
+    }),
+
   // Leave room
   leaveRoom: publicProcedure
     .input(z.object({
@@ -398,5 +459,59 @@ export const gameRouter = createTRPCRouter({
       });
 
       return player;
+    }),
+
+  // Get in-memory game state from game server
+  getGameState: publicProcedure
+    .input(z.object({
+      roomCode: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const response = await fetch(
+        `${GAME_SERVER_URL}/api/game-state/${input.roomCode.toUpperCase()}`
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null; // Game not started yet
+        }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch game state",
+        });
+      }
+
+      const data = await response.json();
+
+      // Transform the data for client consumption
+      return {
+        roomId: data.roomId as string,
+        phase: data.phase as string,
+        roundType: data.roundType as string,
+        roundNumber: data.roundNumber as number,
+        totalRounds: data.totalRounds as number,
+        scores: data.scores as [string, number][],
+        board: data.board as {
+          categories: string[];
+          grid?: Array<{
+            questionId: string;
+            value: number;
+            isAnswered: boolean;
+            isDailyDouble: boolean;
+            col: number;
+          }>;
+        } | undefined,
+        currentQuestion: data.currentQuestion as {
+          id: string;
+          clue: string;
+          category?: string;
+          value?: number;
+        } | undefined,
+        currentPlayerId: data.currentPlayerId as string | undefined,
+        selectorPlayerId: data.selectorPlayerId as string | undefined,
+        buzzQueue: data.buzzQueue as string[],
+        timeRemaining: data.timeRemaining as number | undefined,
+        currentWager: data.currentWager as number | undefined,
+      };
     }),
 });

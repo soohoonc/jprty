@@ -1,0 +1,23 @@
+{
+  "name": "@jprty/import-cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "jprty-import": "./src/index.ts"
+  },
+  "scripts": {
+    "import": "bun run src/index.ts import"
+  },
+  "dependencies": {
+    "@jprty/db": "*",
+    "commander": "^12.1.0",
+    "csv-parse": "^5.6.0"
+  },
+  "devDependencies": {
+    "@jprty/typescript-config": "*",
+    "@types/node": "^22.15.29"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

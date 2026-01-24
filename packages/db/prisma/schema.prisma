@@ -56,14 +56,49 @@ model Player {
 }
 
 model Question {
-    id            String      @id @default(cuid())
-    clue          String      @db.Text
-    answer        String      @db.Text
-    difficulty    String      // "easy" | "medium" | "hard"
-    questionSetId String      @map("question_set_id")
-    questionSet   QuestionSet @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+    id              String       @id @default(cuid())
+    clue            String       @db.Text
+    answer          String       @db.Text
+    difficulty      String       // "easy" | "medium" | "hard"
+    difficultyScore Int?         @map("difficulty_score") @db.SmallInt // 1-5 score
+    airDate         DateTime?    @map("air_date") // Original air date
+    showNumber      Int?         @map("show_number") // J-Archive show number
+    roundType       String?      @map("round_type") // Jeopardy!/Double/Final
+    value           Int?         // Original dollar value
+    clueHash        String?      @unique @map("clue_hash") // For deduplication
+    source          String?      // "jarchive", "manual"
+    externalId      String?      @map("external_id") // Source ID
+    questionSetId   String?      @map("question_set_id") // Now nullable
+    questionSet     QuestionSet? @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+    tags            QuestionTag[]
+    createdAt       DateTime     @default(now()) @map("created_at")
+    updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at")
 
+    @@unique([source, externalId])
+    @@index([airDate])
+    @@index([difficultyScore])
     @@map("question")
+}
+
+model Tag {
+    id          String        @id @default(cuid())
+    name        String        @unique
+    description String?       @db.Text
+    questions   QuestionTag[]
+    createdAt   DateTime      @default(now()) @map("created_at")
+    updatedAt   DateTime      @updatedAt @map("updated_at")
+
+    @@map("tag")
+}
+
+model QuestionTag {
+    questionId String   @map("question_id")
+    question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+    tagId      String   @map("tag_id")
+    tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+    @@id([questionId, tagId])
+    @@map("question_tag")
 }
 
 model QuestionSet {

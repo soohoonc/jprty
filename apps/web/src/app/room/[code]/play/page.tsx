@@ -1,244 +1,263 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useSocket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { GAME_EVENTS, ROOM_EVENTS } from "@jprty/shared";
-
-interface Question {
-  id: string;
-  clue: string;
-  value: number;
-  category: string;
-}
-
-interface GameBoard {
-  categories: string[];
-  answeredQuestions: Set<string>;
-}
+import { useSocket } from "@/lib/socket";
+import { useGameState } from "@/lib/use-game-state";
+import { ROOM_EVENTS } from "@jprty/shared";
+import { ChevronLeft, ChevronRight, Loader2, ArrowRight } from "lucide-react";
 
 export default function PlayerPage() {
   const params = useParams();
   const router = useRouter();
   const roomCode = params.code as string;
-  const { socket } = useSocket();
+  const { socket, isConnected } = useSocket();
+  const hasJoinedRef = useRef(false);
 
-  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
-  const [gameStatus, setGameStatus] = useState<string>("WAITING");
-  const [buzzedPlayer, setBuzzedPlayer] = useState<string | null>(null);
+  const [playerId, setPlayerId] = useState<string | null>(null);
   const [playerAnswer, setPlayerAnswer] = useState("");
-  const [canBuzz, setCanBuzz] = useState(false);
-  const [showAnswer, setShowAnswer] = useState(false);
-  const [correctAnswer, setCorrectAnswer] = useState("");
-  const [isMyTurn, setIsMyTurn] = useState(false);
-  const [answerResult, setAnswerResult] = useState<{
-    isCorrect: boolean;
-    pointChange: number;
-  } | null>(null);
-  const [isSelector, setIsSelector] = useState(false);
-  const [gameBoard, setGameBoard] = useState<GameBoard | null>(null);
+  const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
 
+  // Next question countdown (Netflix-style) for player who answered correctly
+  const AUTO_ADVANCE_SECONDS = 8;
+  const [nextQuestionCountdown, setNextQuestionCountdown] = useState<number | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get playerId on mount
   useEffect(() => {
-    if (!socket) return;
+    setPlayerId(localStorage.getItem("playerId"));
+  }, []);
 
-    const playerId = localStorage.getItem("playerId");
+  // Join room as player when socket connects
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+    if (hasJoinedRef.current) return;
+    hasJoinedRef.current = true;
 
-    // Player already joined from room page - just request current state
-    socket.emit(ROOM_EVENTS.GET_STATE);
+    const playerName = localStorage.getItem("playerName") || "Guest";
+    socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName });
 
-    socket.on(ROOM_EVENTS.STATE, (data) => {
-      // Update board if available
-      if (data.board) {
-        setGameBoard({
-          categories: data.board.categories || [],
-          answeredQuestions: new Set(data.board.answeredQuestions || []),
-        });
-      }
+    // Handle JOINED response to update playerId (in case it changed)
+    const handleJoined = (data: { player: { id: string } }) => {
+      localStorage.setItem("playerId", data.player.id);
+      setPlayerId(data.player.id);
+    };
 
-      // Check if this player is the selector
-      setIsSelector(data.selectorPlayerId === playerId);
+    socket.on(ROOM_EVENTS.JOINED, handleJoined);
 
-      if (data.phase === "SELECTING") {
-        setGameStatus("SELECTING");
-        setCurrentQuestion(null);
-      } else if (data.phase && data.currentQuestion) {
-        setGameStatus(data.phase);
-        setCurrentQuestion({
-          id: data.currentQuestion.id,
-          clue: data.currentQuestion.clue,
-          category: data.currentQuestion.id?.split("_")[0] || "Unknown",
-          value: data.currentQuestion.value || 0,
-        });
-      }
-    });
-
-    socket.on(ROOM_EVENTS.GAME_STARTED, (data) => {
-      if (data.board) {
-        setGameBoard({
-          categories: data.board.categories || [],
-          answeredQuestions: new Set(data.board.answeredQuestions || []),
-        });
-      }
-      // Check if this player is the selector from state
-      const isSelectorPlayer = data.state?.selectorPlayerId === playerId;
-      setIsSelector(isSelectorPlayer);
-      setGameStatus("SELECTING");
-    });
-
-    socket.on(GAME_EVENTS.QUESTION_SELECTED, (data) => {
-      setCurrentQuestion({
-        id: data.question?.id || data.questionId,
-        clue: data.question?.clue || `Question for ${data.questionId}`,
-        category: data.questionId?.split("_")[0] || "Unknown",
-        value: data.value || parseInt(data.questionId?.split("_")[1]) || 0,
-      });
-      setGameStatus("QUESTION_DISPLAY");
-      setShowAnswer(false);
-      setBuzzedPlayer(null);
-      setPlayerAnswer("");
-      setIsMyTurn(false);
-      setCanBuzz(false);
-      setAnswerResult(null);
-    });
-
-    socket.on(GAME_EVENTS.BUZZER_OPEN, () => {
-      setGameStatus("BUZZER_OPEN");
-      setCanBuzz(true);
-    });
-
-    socket.on(GAME_EVENTS.PLAYER_BUZZED, (data) => {
-      setBuzzedPlayer(data.playerName || data.playerId);
-      setCanBuzz(false);
-      setGameStatus("ANSWERING");
-      const playerId = localStorage.getItem("playerId");
-      setIsMyTurn(data.playerId === playerId);
-    });
-
-    socket.on(GAME_EVENTS.ANSWER_RESULT, (data) => {
-      setShowAnswer(true);
-      setCorrectAnswer(data.correctAnswer);
-      setGameStatus("ANSWER_REVEAL");
-      setAnswerResult({
-        isCorrect: data.isCorrect,
-        pointChange: data.pointChange,
-      });
-
-      const playerId = localStorage.getItem("playerId");
-      if (data.playerId === playerId) {
-        if (data.isCorrect) {
-          toast.success(`Correct! +${data.pointChange}`);
-        } else {
-          toast.error(`Wrong! ${data.pointChange}`);
-        }
-      }
-    });
-
-    socket.on(GAME_EVENTS.STATE_UPDATE, (data) => {
-      // Update board if available
-      if (data.board) {
-        setGameBoard({
-          categories: data.board.categories || gameBoard?.categories || [],
-          answeredQuestions: new Set(data.board.answeredQuestions || []),
-        });
-      }
-
-      // Check if this player is the selector
-      if (data.selectorPlayerId !== undefined) {
-        setIsSelector(data.selectorPlayerId === playerId);
-      }
-
-      if (data.phase === "SELECTING") {
-        setCurrentQuestion(null);
-        setGameStatus("SELECTING");
-        setShowAnswer(false);
-        setBuzzedPlayer(null);
-        setIsMyTurn(false);
-        setCanBuzz(false);
-        setAnswerResult(null);
-      }
-    });
-
-    socket.on(GAME_EVENTS.GAME_END, () => {
-      toast.success("Game Over!");
-      router.push(`/room/${roomCode}/results`);
-    });
+    // Request current game state after joining (handles refresh case)
+    const storedPlayerId = localStorage.getItem("playerId");
+    socket.emit(ROOM_EVENTS.GET_STATE, { playerId: storedPlayerId, isHost: false });
 
     return () => {
-      socket.off(ROOM_EVENTS.STATE);
-      socket.off(ROOM_EVENTS.GAME_STARTED);
-      socket.off(GAME_EVENTS.QUESTION_SELECTED);
-      socket.off(GAME_EVENTS.BUZZER_OPEN);
-      socket.off(GAME_EVENTS.PLAYER_BUZZED);
-      socket.off(GAME_EVENTS.ANSWER_RESULT);
-      socket.off(GAME_EVENTS.STATE_UPDATE);
-      socket.off(GAME_EVENTS.GAME_END);
+      socket.off(ROOM_EVENTS.JOINED, handleJoined);
     };
-  }, [socket, roomCode, router]);
+  }, [socket, isConnected, roomCode]);
+
+  const {
+    gameBoard,
+    currentQuestion,
+    gameStatus,
+    buzzedPlayer,
+    canBuzz,
+    isMyTurn,
+    answerResult,
+    isSelector,
+    isLoading,
+    timeRemaining,
+    totalTime,
+    showAnswer,
+    correctAnswer,
+    selectQuestion,
+    buzz,
+    submitAnswer,
+    nextQuestion,
+  } = useGameState({
+    roomCode,
+    playerId,
+    enabled: !!playerId && isConnected,
+    onGameEnd: () => {
+      toast.success("Game Over!");
+      router.push(`/room/${roomCode}/results`);
+    },
+    onError: (message) => toast.error(message),
+  });
 
   const handleBuzz = () => {
-    if (!socket || !canBuzz) return;
-    socket.emit(GAME_EVENTS.BUZZ);
-    setCanBuzz(false);
+    buzz();
   };
 
+  const handleNextQuestion = useCallback(() => {
+    nextQuestion();
+    setNextQuestionCountdown(null);
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+  }, [nextQuestion]);
+
+  // Start countdown when answer is revealed (REVEALING phase) and this player is the selector
+  // Don't start if others can still buzz in
+  useEffect(() => {
+    if (showAnswer && isSelector && gameStatus === "REVEALING" && nextQuestionCountdown === null) {
+      setNextQuestionCountdown(AUTO_ADVANCE_SECONDS);
+    }
+  }, [showAnswer, isSelector, gameStatus, nextQuestionCountdown]);
+
+  // Countdown timer for next question
+  useEffect(() => {
+    if (nextQuestionCountdown === null || nextQuestionCountdown <= 0) return;
+
+    countdownRef.current = setInterval(() => {
+      setNextQuestionCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(countdownRef.current!);
+          countdownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
+    };
+  }, [nextQuestionCountdown]);
+
+  // Auto-advance when countdown reaches 0
+  useEffect(() => {
+    if (nextQuestionCountdown === 0) {
+      handleNextQuestion();
+    }
+  }, [nextQuestionCountdown, handleNextQuestion]);
+
+  // Reset countdown when moving to next question (SELECTING phase)
+  useEffect(() => {
+    if (gameStatus === "SELECTING") {
+      setNextQuestionCountdown(null);
+    }
+  }, [gameStatus]);
+
   const handleSubmitAnswer = () => {
-    if (!socket || !playerAnswer.trim()) return;
-    socket.emit(GAME_EVENTS.SUBMIT_ANSWER, { answer: playerAnswer });
+    submitAnswer(playerAnswer);
     setPlayerAnswer("");
-    setIsMyTurn(false);
   };
 
   const handleSelectQuestion = (questionId: string) => {
-    if (!socket || !isSelector || gameStatus !== "SELECTING") return;
-    socket.emit(GAME_EVENTS.SELECT_QUESTION, { questionId });
+    selectQuestion(questionId);
   };
+
+  // Show result toast when answer result comes in for this player
+  useEffect(() => {
+    if (answerResult?.playerId === playerId) {
+      if (answerResult.isCorrect) {
+        toast.success(`Correct! +${answerResult.pointChange}`);
+      } else {
+        toast.error(`Wrong! ${answerResult.pointChange}`);
+      }
+    }
+  }, [answerResult, playerId]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-blue-900 p-4">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-white mx-auto" />
+          <p className="text-white/70">Loading game...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-blue-900 p-4">
       <div className="max-w-2xl mx-auto">
-        <div className="mb-4">
-          <Badge variant="secondary">{roomCode}</Badge>
+        <div className="mb-6 flex items-center justify-between">
+          <span className="text-white text-sm font-mono">{roomCode}</span>
+          <span className="text-white/40 text-xs uppercase tracking-wide">
+            {gameStatus.replace("_", " ")}
+          </span>
         </div>
 
-        {/* Selector View - Show board to pick questions */}
+        {/* Selector View - Show one category at a time */}
         {gameStatus === "SELECTING" && isSelector && gameBoard && !currentQuestion && (
           <div className="space-y-4">
-            <Card className="bg-green-900/50 border-green-500">
-              <CardContent className="p-4 text-center">
-                <p className="text-green-400 font-medium">Your turn to pick a question!</p>
-              </CardContent>
-            </Card>
-            <div className="grid grid-cols-6 gap-1">
-              {gameBoard.categories.map((category) => (
-                <div key={category} className="space-y-1">
-                  <div className="bg-blue-800 text-white text-center p-2 text-xs font-semibold uppercase truncate">
-                    {category}
-                  </div>
-                  {[200, 400, 600, 800, 1000].map((value) => {
-                    const questionId = `${category}_${value}`;
-                    const isAnswered = gameBoard.answeredQuestions?.has(questionId);
+            {/* Category Navigation */}
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCurrentCategoryIndex((prev) =>
+                  prev > 0 ? prev - 1 : gameBoard.categories.length - 1
+                )}
+                className="text-white hover:bg-white/10"
+              >
+                <ChevronLeft className="h-8 w-8" />
+              </Button>
 
-                    return (
-                      <button
-                        key={questionId}
-                        disabled={isAnswered}
-                        onClick={() => handleSelectQuestion(questionId)}
-                        className={`w-full p-3 text-lg font-bold text-yellow-400 ${
-                          isAnswered
-                            ? "bg-blue-950 cursor-not-allowed opacity-30"
-                            : "bg-blue-700 hover:bg-blue-600 cursor-pointer"
-                        }`}
-                      >
-                        {isAnswered ? "" : `$${value}`}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="flex-1 text-center">
+                <p className="text-white/50 text-sm mb-1">
+                  {currentCategoryIndex + 1} of {gameBoard.categories.length}
+                </p>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCurrentCategoryIndex((prev) =>
+                  prev < gameBoard.categories.length - 1 ? prev + 1 : 0
+                )}
+                className="text-white hover:bg-white/10"
+              >
+                <ChevronRight className="h-8 w-8" />
+              </Button>
+            </div>
+
+            {/* Single Category Column */}
+            <div className="space-y-2">
+              <div className="bg-blue-800 text-white text-center p-4 text-lg font-semibold uppercase">
+                {gameBoard.categories[currentCategoryIndex]}
+              </div>
+              {[200, 400, 600, 800, 1000].map((value) => {
+                const category = gameBoard.categories[currentCategoryIndex];
+                const questionId = `${category}_${value}`;
+                const isAnswered = gameBoard.answeredQuestions?.has(questionId);
+
+                return (
+                  <button
+                    key={questionId}
+                    disabled={isAnswered}
+                    onClick={() => handleSelectQuestion(questionId)}
+                    className={`w-full h-16 flex items-center justify-center text-2xl font-bold text-yellow-400 rounded-lg transition-all ${
+                      isAnswered
+                        ? "bg-blue-950 cursor-not-allowed opacity-30"
+                        : "bg-blue-700 hover:bg-blue-600 active:scale-95 cursor-pointer"
+                    }`}
+                  >
+                    {!isAnswered && `$${value}`}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Category dots indicator */}
+            <div className="flex justify-center gap-2 pt-2">
+              {gameBoard.categories.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentCategoryIndex(idx)}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    idx === currentCategoryIndex ? "bg-yellow-400 w-4" : "bg-white/30"
+                  }`}
+                />
               ))}
             </div>
           </div>
@@ -246,20 +265,16 @@ export default function PlayerPage() {
 
         {/* Waiting State - Not selector */}
         {gameStatus === "SELECTING" && !isSelector && !currentQuestion && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">Waiting for question selection...</p>
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-center py-20">
+            <p className="text-white/40 text-sm">Waiting for question selection</p>
+          </div>
         )}
 
         {/* Waiting State - Initial */}
         {gameStatus === "WAITING" && !currentQuestion && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">Waiting for game to start...</p>
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-center py-20">
+            <p className="text-white/40 text-sm">Waiting for game to start</p>
+          </div>
         )}
 
         {/* Question Display */}
@@ -275,18 +290,32 @@ export default function PlayerPage() {
               <p className="text-xl text-center">{currentQuestion.clue}</p>
 
               {/* Buzzer */}
-              {gameStatus === "BUZZER_OPEN" && canBuzz && (
-                <Button
-                  onClick={handleBuzz}
-                  size="lg"
-                  className="w-full bg-red-600 hover:bg-red-500 text-xl py-8"
-                >
-                  BUZZ
-                </Button>
+              {gameStatus === "BUZZING" && canBuzz && (
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleBuzz}
+                    size="lg"
+                    className="w-full bg-red-600 hover:bg-red-500 text-xl py-8"
+                  >
+                    BUZZ
+                  </Button>
+                  {/* Buzz countdown bar */}
+                  {timeRemaining !== null && totalTime !== null && (
+                    <div className="w-full">
+                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-red-400 transition-all duration-1000 ease-linear"
+                          style={{ width: `${(timeRemaining / totalTime) * 100}%` }}
+                        />
+                      </div>
+                      <p className="text-red-600/70 text-sm mt-1 text-center">{timeRemaining}s</p>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Reading */}
-              {gameStatus === "QUESTION_DISPLAY" && (
+              {gameStatus === "READING" && (
                 <p className="text-center text-muted-foreground">
                   Get ready to buzz...
                 </p>
@@ -303,6 +332,18 @@ export default function PlayerPage() {
                   <p className="text-center text-green-600 font-medium">
                     You buzzed! Answer:
                   </p>
+                  {/* Answer countdown bar */}
+                  {timeRemaining !== null && totalTime !== null && (
+                    <div className="w-full">
+                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 transition-all duration-1000 ease-linear"
+                          style={{ width: `${(timeRemaining / totalTime) * 100}%` }}
+                        />
+                      </div>
+                      <p className="text-green-600/70 text-sm mt-1 text-center">{timeRemaining}s</p>
+                    </div>
+                  )}
                   <Input
                     value={playerAnswer}
                     onChange={(e) => setPlayerAnswer(e.target.value)}
@@ -320,8 +361,8 @@ export default function PlayerPage() {
                 </div>
               )}
 
-              {/* Result */}
-              {answerResult && (
+              {/* Brief feedback for the answering player only */}
+              {answerResult && answerResult.playerId === playerId && (
                 <div
                   className={`text-center p-4 rounded ${
                     answerResult.isCorrect ? "bg-green-100" : "bg-red-100"
@@ -330,18 +371,40 @@ export default function PlayerPage() {
                   <p className="font-bold">
                     {answerResult.isCorrect ? "CORRECT" : "WRONG"}
                   </p>
-                  <p>
-                    {answerResult.isCorrect ? "+" : ""}
-                    {answerResult.pointChange}
+                  <p className="text-sm text-muted-foreground">
+                    {answerResult.isCorrect ? "+" : ""}{answerResult.pointChange} points
                   </p>
                 </div>
               )}
 
-              {/* Answer Reveal */}
-              {showAnswer && (
-                <div className="text-center pt-4 border-t">
-                  <p className="text-sm text-muted-foreground">Answer:</p>
-                  <p className="text-green-600 font-medium">{correctAnswer}</p>
+              {/* Netflix-style Next Question button for selector (whoever picks next) */}
+              {/* Only show when in REVEALING phase - not while others can still buzz */}
+              {showAnswer && isSelector && gameStatus === "REVEALING" && (
+                <div className="mt-4 p-4 bg-blue-50 rounded text-center">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Correct answer: {correctAnswer}
+                  </p>
+                  <Button
+                    onClick={handleNextQuestion}
+                    className="relative overflow-hidden bg-blue-600 hover:bg-blue-500 text-white px-6 py-4"
+                  >
+                    {/* Progress bar background */}
+                    {nextQuestionCountdown !== null && nextQuestionCountdown > 0 && (
+                      <div
+                        className="absolute inset-0 bg-blue-400 transition-all duration-1000 ease-linear"
+                        style={{
+                          width: `${((AUTO_ADVANCE_SECONDS - nextQuestionCountdown) / AUTO_ADVANCE_SECONDS) * 100}%`,
+                        }}
+                      />
+                    )}
+                    <span className="relative flex items-center gap-2">
+                      Pick Next Question
+                      <ArrowRight className="h-4 w-4" />
+                      {nextQuestionCountdown !== null && nextQuestionCountdown > 0 && (
+                        <span className="text-sm opacity-70">({nextQuestionCountdown}s)</span>
+                      )}
+                    </span>
+                  </Button>
                 </div>
               )}
             </CardContent>

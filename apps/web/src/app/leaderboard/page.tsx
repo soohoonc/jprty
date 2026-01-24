@@ -13,10 +13,10 @@ type Period = "DAILY" | "WEEKLY" | "MONTHLY" | "ALL_TIME";
 export default function LeaderboardPage() {
   const [period, setPeriod] = useState<Period>("ALL_TIME");
 
-  const { data: entries, isLoading, error } = api.game.getLeaderboard.useQuery({
-    period,
-    limit: 50,
-  });
+  const { data: entries, isLoading, error } = api.game.getLeaderboard.useQuery(
+    { period, limit: 50 },
+    { staleTime: 5 * 60 * 1000 } // Cache for 5 minutes
+  );
 
   const getRankStyle = (rank: number) => {
     if (rank === 1) return "bg-gradient-to-r from-yellow-100 to-yellow-200 border-2 border-yellow-400";

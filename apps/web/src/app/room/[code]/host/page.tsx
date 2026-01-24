@@ -1,148 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useSocket } from "@/lib/socket";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { GAME_EVENTS, ROOM_EVENTS } from "@jprty/shared";
-
-interface Question {
-  id: string;
-  clue: string;
-  answer?: string;
-  value: number;
-  category: string;
-}
-
-interface GameBoard {
-  categories: string[];
-  answeredQuestions: Set<string>;
-}
+import { useSocket } from "@/lib/socket";
+import { useGameState } from "@/lib/use-game-state";
+import { ROOM_EVENTS } from "@jprty/shared";
+import { Loader2 } from "lucide-react";
 
 export default function HostPage() {
   const params = useParams();
   const router = useRouter();
   const roomCode = params.code as string;
-  const { socket } = useSocket();
+  const { socket, isConnected } = useSocket();
+  const hasJoinedRef = useRef(false);
 
-  const [gameBoard, setGameBoard] = useState<GameBoard | null>(null);
-  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
-  const [gameStatus, setGameStatus] = useState<string>("SELECTING");
-  const [buzzedPlayer, setBuzzedPlayer] = useState<string | null>(null);
-  const [playerAnswer, setPlayerAnswer] = useState<string | null>(null);
-  const [showAnswer, setShowAnswer] = useState(false);
-  const [correctAnswer, setCorrectAnswer] = useState("");
-  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-
+  // Join room as host when socket connects
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !isConnected) return;
+    if (hasJoinedRef.current) return;
+    hasJoinedRef.current = true;
 
-    // Host already joined from lobby - request current state with host flag
+    socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName: "Host", isHost: true });
+
+    // Request current game state after joining (handles refresh case)
     socket.emit(ROOM_EVENTS.GET_STATE, { isHost: true });
+  }, [socket, isConnected, roomCode]);
 
-    socket.on(ROOM_EVENTS.STATE, (data) => {
-      if (data.board) {
-        setGameBoard({
-          ...data.board,
-          answeredQuestions: new Set(data.board.answeredQuestions || []),
-        });
-        setGameStatus(data.phase || "SELECTING");
-      }
-    });
-
-    socket.on(ROOM_EVENTS.GAME_STARTED, (data) => {
-      if (data.board) {
-        setGameBoard({
-          ...data.board,
-          answeredQuestions: new Set(data.board.answeredQuestions || []),
-        });
-      }
-      setGameStatus("SELECTING");
-    });
-
-    socket.on(GAME_EVENTS.QUESTION_SELECTED, (data) => {
-      setCurrentQuestion({
-        id: data.question?.id || data.questionId,
-        clue: data.question?.clue || `Question for ${data.questionId}`,
-        category: data.questionId?.split("_")[0] || "Unknown",
-        value: data.value || parseInt(data.questionId?.split("_")[1]) || 0,
-      });
-      setGameStatus("QUESTION_DISPLAY");
-      setShowAnswer(false);
-      setBuzzedPlayer(null);
-      setPlayerAnswer(null);
-      setIsCorrect(null);
-    });
-
-    socket.on(GAME_EVENTS.BUZZER_OPEN, () => {
-      setGameStatus("BUZZER_OPEN");
-    });
-
-    socket.on(GAME_EVENTS.PLAYER_BUZZED, (data) => {
-      setBuzzedPlayer(data.playerName || data.playerId);
-      setGameStatus("ANSWERING");
-    });
-
-    socket.on(GAME_EVENTS.ANSWER_RESULT, (data) => {
-      setPlayerAnswer(data.answer);
-      setShowAnswer(true);
-      setCorrectAnswer(data.correctAnswer);
-      setIsCorrect(data.isCorrect);
-      setGameStatus("ANSWER_REVEAL");
-
-      if (data.isCorrect) {
-        toast.success(`Correct! +${data.pointChange}`);
-      } else {
-        toast.error(`Wrong! ${data.pointChange}`);
-      }
-    });
-
-    socket.on(GAME_EVENTS.STATE_UPDATE, (data) => {
-      if (data.phase === "SELECTING") {
-        setCurrentQuestion(null);
-        setGameStatus("SELECTING");
-        setShowAnswer(false);
-        setBuzzedPlayer(null);
-        setPlayerAnswer(null);
-        setIsCorrect(null);
-
-        if (data.board) {
-          setGameBoard({
-            categories: data.board.categories || gameBoard?.categories || [],
-            answeredQuestions: new Set(data.board.answeredQuestions || []),
-          });
-        }
-      }
-    });
-
-    socket.on(GAME_EVENTS.GAME_END, () => {
+  const {
+    gameBoard,
+    currentQuestion,
+    gameStatus,
+    buzzedPlayer,
+    playerAnswer,
+    answeringPlayerName,
+    showAnswer,
+    correctAnswer,
+    isCorrect,
+    isLoading,
+    timeRemaining,
+    totalTime,
+  } = useGameState({
+    roomCode,
+    isHost: true,
+    enabled: isConnected,
+    onGameEnd: () => {
       toast.success("Game Over!");
       router.push(`/room/${roomCode}/results`);
-    });
+    },
+    onError: (message) => toast.error(message),
+  });
 
-    return () => {
-      socket.off(ROOM_EVENTS.STATE);
-      socket.off(ROOM_EVENTS.GAME_STARTED);
-      socket.off(GAME_EVENTS.QUESTION_SELECTED);
-      socket.off(GAME_EVENTS.BUZZER_OPEN);
-      socket.off(GAME_EVENTS.PLAYER_BUZZED);
-      socket.off(GAME_EVENTS.ANSWER_RESULT);
-      socket.off(GAME_EVENTS.STATE_UPDATE);
-      socket.off(GAME_EVENTS.GAME_END);
-    };
-  }, [socket, roomCode, router, gameBoard?.categories]);
-
-  const handleSelectQuestion = (questionId: string) => {
-    if (!socket || gameStatus !== "SELECTING") return;
-    socket.emit(GAME_EVENTS.SELECT_QUESTION, { questionId });
-  };
-
-  if (!gameBoard) {
+  // Loading state
+  if (isLoading || !gameBoard) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading game...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-blue-900 p-4">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-yellow-400 mx-auto" />
+          <p className="text-white/70 text-lg">Loading game board...</p>
+        </div>
       </div>
     );
   }
@@ -157,7 +75,7 @@ export default function HostPage() {
           <Badge variant="secondary">{roomCode}</Badge>
         </div>
 
-        {/* Game Board */}
+        {/* Game Board - Display Only (no interaction) */}
         {gameStatus === "SELECTING" && !currentQuestion && (
           <div className="grid grid-cols-6 gap-2">
             {gameBoard.categories.map((category) => (
@@ -170,18 +88,18 @@ export default function HostPage() {
                   const isAnswered = gameBoard.answeredQuestions?.has(questionId);
 
                   return (
-                    <button
+                    <div
                       key={questionId}
-                      disabled={isAnswered}
-                      onClick={() => handleSelectQuestion(questionId)}
-                      className={`w-full p-4 text-xl font-bold text-yellow-400 ${
+                      className={`w-full h-16 flex items-center justify-center text-xl font-bold ${
                         isAnswered
-                          ? "bg-blue-950 cursor-not-allowed opacity-30"
-                          : "bg-blue-700 hover:bg-blue-600 cursor-pointer"
+                          ? "bg-blue-950 opacity-30"
+                          : "bg-blue-700"
                       }`}
                     >
-                      {isAnswered ? "" : `$${value}`}
-                    </button>
+                      {!isAnswered && (
+                        <span className="text-yellow-400">${value}</span>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -201,19 +119,50 @@ export default function HostPage() {
 
               <p className="text-2xl mb-8">{currentQuestion.clue}</p>
 
-              {gameStatus === "BUZZER_OPEN" && (
-                <p className="text-yellow-400 text-xl">BUZZER OPEN</p>
+              {gameStatus === "BUZZING" && (
+                <div className="space-y-3">
+                  <p className="text-yellow-400 text-xl">BUZZER OPEN</p>
+                  {/* Buzz countdown bar */}
+                  {timeRemaining !== null && totalTime !== null && (
+                    <div className="w-full max-w-md mx-auto">
+                      <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-yellow-400 transition-all duration-1000 ease-linear"
+                          style={{ width: `${(timeRemaining / totalTime) * 100}%` }}
+                        />
+                      </div>
+                      <p className="text-yellow-400/70 text-sm mt-1">{timeRemaining}s</p>
+                    </div>
+                  )}
+                </div>
               )}
 
-              {buzzedPlayer && (
-                <p className="text-green-400 text-xl">{buzzedPlayer} buzzed!</p>
+              {buzzedPlayer && !playerAnswer && (
+                <div className="space-y-3">
+                  <p className="text-green-400 text-xl">{buzzedPlayer} buzzed!</p>
+                  {/* Answer countdown bar */}
+                  {timeRemaining !== null && totalTime !== null && gameStatus === "ANSWERING" && (
+                    <div className="w-full max-w-md mx-auto">
+                      <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-400 transition-all duration-1000 ease-linear"
+                          style={{ width: `${(timeRemaining / totalTime) * 100}%` }}
+                        />
+                      </div>
+                      <p className="text-green-400/70 text-sm mt-1">{timeRemaining}s to answer</p>
+                    </div>
+                  )}
+                </div>
               )}
 
               {playerAnswer && (
-                <div className="mt-4">
-                  <p className="text-gray-300">Answered: "{playerAnswer}"</p>
-                  <p className={isCorrect ? "text-green-400" : "text-red-400"}>
-                    {isCorrect ? "CORRECT" : "WRONG"}
+                <div className="mt-4 space-y-2">
+                  <p className="text-white text-lg">
+                    {answeringPlayerName || "Player"} answered:
+                  </p>
+                  <p className="text-2xl font-bold">&quot;{playerAnswer}&quot;</p>
+                  <p className={`text-3xl font-bold ${isCorrect ? "text-green-400" : "text-red-400"}`}>
+                    {isCorrect ? "CORRECT!" : "WRONG!"}
                   </p>
                 </div>
               )}
@@ -222,6 +171,11 @@ export default function HostPage() {
                 <div className="mt-6 pt-6 border-t border-blue-600">
                   <p className="text-gray-400 text-sm">Correct answer:</p>
                   <p className="text-green-400 text-xl">{correctAnswer}</p>
+
+                  {/* Waiting for player to advance indicator */}
+                  <div className="mt-6 text-white/50 text-sm">
+                    Waiting for player to select next question...
+                  </div>
                 </div>
               )}
             </CardContent>

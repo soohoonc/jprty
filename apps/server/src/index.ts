@@ -3,19 +3,51 @@ import { cors } from 'hono/cors';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
+import { db } from '@jprty/db';
 import { registerEventHandlers } from './events';
+import { gameState } from './game/state';
 
 dotenv.config();
 
 const app = new Hono();
 
+// Allow multiple origins for local development
+const CORS_ORIGINS = process.env.CLIENT_URL?.split(',') || [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+];
+
 app.use('/*', cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: CORS_ORIGINS,
   credentials: true,
 }));
 
 app.get('/health', (c) => {
   return c.json({ status: 'ok' });
+});
+
+// Get game state snapshot for a room
+app.get('/api/game-state/:roomCode', async (c) => {
+  const roomCode = c.req.param('roomCode').toUpperCase();
+
+  const room = await db.room.findUnique({
+    where: { code: roomCode },
+  });
+
+  if (!room) {
+    return c.json({ error: 'Room not found' }, 404);
+  }
+
+  const snapshot = gameState.getSnapshot(room.id);
+
+  if (!snapshot) {
+    return c.json({ error: 'Game not started' }, 404);
+  }
+
+  console.log(`[API] /api/game-state/${roomCode} - phase: ${snapshot.phase}, selectorPlayerId: ${snapshot.selectorPlayerId}, currentQuestion: ${snapshot.currentQuestion?.id || 'null'}`);
+
+  return c.json(snapshot);
 });
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -39,7 +71,7 @@ const httpServer = createServer(async (req, res) => {
 
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: CORS_ORIGINS,
     credentials: true,
   },
 });

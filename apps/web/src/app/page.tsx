@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "@/lib/socket";
+import { useSocketInvalidation } from "@/lib/use-socket-invalidation";
 import { api } from "@/trpc/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,47 +11,23 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Copy, Monitor, Smartphone, Eye } from "lucide-react";
+import { Copy } from "lucide-react";
 import { RoomSettings } from "@/components/game/room-settings";
 import { ROOM_EVENTS } from "@jprty/shared";
-
-interface Player {
-  id: string;
-  name?: string;
-  guestName?: string;
-  score: number;
-  isHost: boolean;
-  isActive: boolean;
-}
-
-type Mode = "host" | "join" | "spectate";
 
 export default function Home() {
   const router = useRouter();
   const { socket, isConnected } = useSocket();
 
-  // Mode state - null until we detect device
-  const [mode, setMode] = useState<Mode | null>(null);
-
-  // Host state
-  const [roomCode, setRoomCode] = useState<string | null>(null);
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
-
-  // Join state
   const [joinCode, setJoinCode] = useState("");
   const [playerName, setPlayerName] = useState("");
+  const socketJoined = useRef(false);
 
-  // Set default mode based on device width (only on mount)
-  useEffect(() => {
-    const isMobile = window.innerWidth < 768;
-    setMode(isMobile ? "join" : "host");
-  }, []);
+  // View mode: null = not yet determined, 'host' or 'join'
+  const [viewMode, setViewMode] = useState<'host' | 'join' | null>(null);
 
-  const createRoomMutation = api.game.createRoom.useMutation({
-    onSuccess: (room) => {
-      setRoomCode(room.code);
-      setRoomId(room.id);
+  const createRoom = api.game.createRoom.useMutation({
+    onSuccess: () => {
       localStorage.setItem("isHost", "true");
     },
     onError: (error) => {
@@ -58,278 +35,188 @@ export default function Home() {
     },
   });
 
-  // Create room when switching to host mode
+  // Derive room info from mutation result
+  const roomCode = createRoom.data?.code ?? null;
+  const roomId = createRoom.data?.id ?? null;
+
+  // Get room data from React Query (including players)
+  const { data: room } = api.game.getRoom.useQuery(
+    { roomCode: roomCode! },
+    { enabled: !!roomCode }
+  );
+
+  // Socket invalidation for player updates
+  useSocketInvalidation({ roomCode: roomCode || "", enabled: !!roomCode });
+
+  // Players from React Query (excludes host)
+  const players = room?.players?.filter((p) => !p.userId || p.userId !== room.hostId) || [];
+
+  // Set initial view mode based on screen size (only once on mount)
   useEffect(() => {
-    if (mode === "host" && !roomCode && !createRoomMutation.isPending) {
-      createRoomMutation.mutate({ name: "Host" });
+    if (viewMode === null) {
+      const isMobile = window.innerWidth < 768;
+      setViewMode(isMobile ? 'join' : 'host');
     }
-  }, [mode, roomCode, createRoomMutation.isPending]);
+  }, [viewMode]);
 
-  // Connect to socket once room is created (host mode)
+  // Create room when switching to host mode (if not already created)
   useEffect(() => {
-    if (!socket || !isConnected || !roomCode || mode !== "host") return;
+    if (viewMode === 'host' && !createRoom.data && !createRoom.isPending) {
+      createRoom.mutate({ name: "Host" });
+    }
+  }, [viewMode, createRoom.data, createRoom.isPending]);
 
+  // Socket setup for host
+  useEffect(() => {
+    if (!socket || !isConnected || !roomCode) return;
+    if (socketJoined.current) return;
+
+    socketJoined.current = true;
     socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName: "Host", isHost: true });
 
-    socket.on(ROOM_EVENTS.JOINED, (data) => {
-      setPlayers(data.players.filter((p: Player) => !p.isHost));
-    });
-
     socket.on(ROOM_EVENTS.PLAYER_JOINED, (data) => {
-      setPlayers(data.players.filter((p: Player) => !p.isHost));
       toast.info(`${data.player.name || data.player.guestName} joined`);
-    });
-
-    socket.on(ROOM_EVENTS.PLAYER_LEFT, (data) => {
-      setPlayers(data.players.filter((p: Player) => !p.isHost));
-      if (data.player?.name || data.player?.guestName) {
-        toast.info(`${data.player.name || data.player.guestName} left`);
-      }
     });
 
     socket.on(ROOM_EVENTS.GAME_STARTED, () => {
       router.push(`/room/${roomCode}/host`);
     });
 
-    socket.on(ROOM_EVENTS.ERROR, (data) => {
-      toast.error(data.message);
-    });
-
     return () => {
-      socket.off(ROOM_EVENTS.JOINED);
       socket.off(ROOM_EVENTS.PLAYER_JOINED);
-      socket.off(ROOM_EVENTS.PLAYER_LEFT);
       socket.off(ROOM_EVENTS.GAME_STARTED);
-      socket.off(ROOM_EVENTS.ERROR);
     };
-  }, [socket, isConnected, roomCode, router, mode]);
+  }, [socket, isConnected, roomCode, router]);
 
-  const handleStartGame = () => {
-    if (!socket) return;
-    socket.emit(ROOM_EVENTS.START_GAME);
-  };
-
-  const handleCopyCode = () => {
-    if (roomCode) {
-      navigator.clipboard.writeText(roomCode);
-      toast.success("Room code copied!");
-    }
-  };
-
-  const handleJoinRoom = () => {
-    if (!joinCode.trim()) {
-      toast.error("Please enter a room code");
-      return;
-    }
-    if (!playerName.trim()) {
-      toast.error("Please enter your name");
+  const handleJoin = () => {
+    if (!joinCode.trim() || !playerName.trim()) {
+      toast.error("Please enter your name and room code");
       return;
     }
     localStorage.setItem("playerName", playerName.trim());
     router.push(`/room/${joinCode.toUpperCase()}`);
   };
 
-  const handleSwitchMode = (newMode: Mode) => {
-    if (newMode === "host" && !roomCode && !createRoomMutation.isPending) {
-      createRoomMutation.mutate({ name: "Host" });
-    }
-    setMode(newMode);
+  const handleStartGame = () => {
+    socket?.emit(ROOM_EVENTS.START_GAME);
   };
 
-  // Loading state while detecting device
-  if (mode === null) {
+  const handleCopyCode = () => {
+    if (roomCode) {
+      navigator.clipboard.writeText(roomCode);
+      toast.success("Copied!");
+    }
+  };
+
+  // Don't render until we've determined the view mode
+  if (viewMode === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-blue-900">
+      <div className="min-h-screen bg-blue-900 p-4 flex items-center justify-center">
         <h1 className="text-4xl font-bold text-white">JPRTY!</h1>
       </div>
     );
   }
 
+  // HOST VIEW
+  if (viewMode === 'host') {
+    return (
+      <div className="min-h-screen bg-blue-900 p-4">
+        <div className="max-w-2xl mx-auto space-y-4">
+          <h1 className="text-4xl font-bold text-white text-center py-4">JPRTY!</h1>
+
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <p className="text-sm text-muted-foreground mb-2">Room Code</p>
+              {roomCode ? (
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-4xl font-mono font-bold tracking-widest">{roomCode}</span>
+                  <Button variant="ghost" size="sm" onClick={handleCopyCode}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-2xl text-muted-foreground">Creating...</span>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Players ({players.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {players.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">Waiting for players...</p>
+              ) : (
+                <div className="space-y-2">
+                  {players.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between p-2 border rounded">
+                      <span>{p.name || p.user?.name}</span>
+                      {!p.isActive && <Badge variant="outline">Offline</Badge>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {roomId && roomCode && <RoomSettings roomId={roomId} roomCode={roomCode} isHost={true} />}
+
+          <Button onClick={handleStartGame} disabled={players.length < 1 || !roomCode} className="w-full" size="lg">
+            Start Game
+          </Button>
+
+          <div className="text-center">
+            <Button variant="link" onClick={() => setViewMode('join')} className="text-white">
+              Join a game instead
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // JOIN VIEW
   return (
     <div className="min-h-screen bg-blue-900 p-4">
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="max-w-md mx-auto space-y-4">
         <h1 className="text-4xl font-bold text-white text-center py-4">JPRTY!</h1>
 
-        {/* Mode Switcher */}
-        <div className="flex gap-2 justify-center">
-          <Button
-            variant={mode === "host" ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleSwitchMode("host")}
-            className="gap-2"
-          >
-            <Monitor className="h-4 w-4" />
-            Host
-          </Button>
-          <Button
-            variant={mode === "join" ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleSwitchMode("join")}
-            className="gap-2"
-          >
-            <Smartphone className="h-4 w-4" />
-            Join
-          </Button>
-          <Button
-            variant={mode === "spectate" ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleSwitchMode("spectate")}
-            className="gap-2"
-          >
-            <Eye className="h-4 w-4" />
-            Spectate
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">Join a Game</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Your Name</Label>
+              <Input
+                placeholder="Enter your name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                maxLength={20}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Room Code</Label>
+              <Input
+                placeholder="ABCD"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                maxLength={4}
+                className="text-center text-2xl font-mono tracking-widest"
+              />
+            </div>
+            <Button onClick={handleJoin} disabled={!joinCode.trim() || !playerName.trim()} className="w-full">
+              Join Room
+            </Button>
+          </CardContent>
+        </Card>
+
+        <div className="text-center">
+          <Button variant="link" onClick={() => setViewMode('host')} className="text-white">
+            Host a game instead
           </Button>
         </div>
-
-        {/* HOST MODE */}
-        {mode === "host" && (
-          <>
-            {/* Room Code */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center space-y-2">
-                  <p className="text-sm text-muted-foreground">Room Code</p>
-                  <div className="flex items-center justify-center gap-2">
-                    {roomCode ? (
-                      <>
-                        <span className="text-4xl font-mono font-bold tracking-widest">
-                          {roomCode}
-                        </span>
-                        <Button variant="ghost" size="sm" onClick={handleCopyCode}>
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <span className="text-2xl text-muted-foreground">Creating...</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Share this code with players
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Players */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle>Players ({players.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {players.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">
-                    Waiting for players to join...
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {players.map((player) => (
-                      <div
-                        key={player.id}
-                        className="flex items-center justify-between p-2 border rounded"
-                      >
-                        <span className="font-medium">
-                          {player.name || player.guestName}
-                        </span>
-                        {!player.isActive && (
-                          <Badge variant="outline">Offline</Badge>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Settings */}
-            {roomId && <RoomSettings roomId={roomId} isHost={true} />}
-
-            {/* Actions */}
-            <Button
-              onClick={handleStartGame}
-              disabled={players.length < 1 || !roomCode}
-              className="w-full"
-              size="lg"
-            >
-              {players.length < 1 ? "Waiting for players..." : "Start Game"}
-            </Button>
-          </>
-        )}
-
-        {/* JOIN MODE */}
-        {mode === "join" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center">Join a Game</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="playerName">Your Name</Label>
-                <Input
-                  id="playerName"
-                  placeholder="Enter your name"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  maxLength={20}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="joinCode">Room Code</Label>
-                <Input
-                  id="joinCode"
-                  placeholder="ABCD"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  maxLength={4}
-                  className="text-center text-2xl font-mono tracking-widest"
-                />
-              </div>
-              <Button
-                onClick={handleJoinRoom}
-                disabled={!joinCode.trim() || !playerName.trim()}
-                className="w-full"
-                size="lg"
-              >
-                Join Room
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* SPECTATE MODE */}
-        {mode === "spectate" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center">Spectate a Game</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="spectateCode">Room Code</Label>
-                <Input
-                  id="spectateCode"
-                  placeholder="ABCD"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  maxLength={4}
-                  className="text-center text-2xl font-mono tracking-widest"
-                />
-              </div>
-              <Button
-                onClick={() => {
-                  if (!joinCode.trim()) {
-                    toast.error("Please enter a room code");
-                    return;
-                  }
-                  router.push(`/room/${joinCode.toUpperCase()}/host`);
-                }}
-                disabled={!joinCode.trim()}
-                className="w-full"
-                size="lg"
-              >
-                Watch Game
-              </Button>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );

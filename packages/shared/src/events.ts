@@ -19,6 +19,7 @@ export const ROOM_EVENTS = {
 export const GAME_EVENTS = {
   // Client -> Server (Host only)
   SELECT_QUESTION: 'game:select_question',
+  NEXT_QUESTION: 'game:next_question',
 
   // Client -> Server (Player only)
   BUZZ: 'game:buzz',

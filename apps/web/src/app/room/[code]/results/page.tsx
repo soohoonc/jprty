@@ -1,69 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useSocket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
-
-interface PlayerResult {
-  id: string;
-  name: string;
-  score: number;
-  correctAnswers: number;
-  incorrectAnswers: number;
-  fastestBuzzMs?: number;
-}
-
-interface GameResults {
-  winner: PlayerResult | null;
-  players: PlayerResult[];
-  roomCode: string;
-  gameId: string;
-}
+import { api } from "@/trpc/react";
 
 export default function ResultsPage() {
   const params = useParams();
   const router = useRouter();
   const roomCode = params.code as string;
-  const { socket } = useSocket();
 
-  const [results, setResults] = useState<GameResults | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Try to get results from localStorage (set when game ended)
-    const storedResults = localStorage.getItem(`game-results-${roomCode}`);
-    if (storedResults) {
-      setResults(JSON.parse(storedResults));
-      setIsLoading(false);
-    }
-
-    if (!socket) return;
-
-    // Listen for results if we missed them
-    socket.on("game-results", (data: GameResults) => {
-      setResults(data);
-      setIsLoading(false);
-      localStorage.setItem(`game-results-${roomCode}`, JSON.stringify(data));
-    });
-
-    // Request results if we don't have them
-    if (!storedResults) {
-      socket.emit("get-results", { roomCode });
-    }
-
-    return () => {
-      socket.off("game-results");
-    };
-  }, [socket, roomCode]);
+  const { data: results, isLoading, error } = api.game.getGameResults.useQuery(
+    { roomCode },
+    { staleTime: Infinity } // Results don't change
+  );
 
   const handlePlayAgain = () => {
-    if (socket) {
-      socket.emit("play-again", { roomCode });
-    }
     router.push(`/room/${roomCode}`);
   };
 
@@ -75,7 +29,7 @@ export default function ResultsPage() {
     );
   }
 
-  if (!results) {
+  if (error || !results) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-900 to-purple-900 gap-6">
         <div className="text-white text-2xl">No results found</div>
@@ -85,8 +39,6 @@ export default function ResultsPage() {
       </div>
     );
   }
-
-  const sortedPlayers = [...results.players].sort((a, b) => b.score - a.score);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 p-4">
@@ -131,7 +83,7 @@ export default function ResultsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {sortedPlayers.map((player, index) => (
+              {results.players.map((player, index) => (
                 <motion.div
                   key={player.id}
                   initial={{ x: -50, opacity: 0 }}
@@ -165,11 +117,6 @@ export default function ResultsPage() {
                         <span className="text-red-600">
                           {player.incorrectAnswers} incorrect
                         </span>
-                        {player.fastestBuzzMs && (
-                          <span className="text-blue-600">
-                            Fastest: {(player.fastestBuzzMs / 1000).toFixed(2)}s
-                          </span>
-                        )}
                       </div>
                     </div>
                   </div>

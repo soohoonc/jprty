@@ -1,72 +1,82 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSocket } from "@/lib/socket";
 import { api } from "@/trpc/react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { ROOM_EVENTS } from "@jprty/shared";
-
-interface Player {
-  id: string;
-  name?: string;
-  guestName?: string;
-  score: number;
-  isHost: boolean;
-  isActive: boolean;
-}
 
 export default function RoomPage() {
   const params = useParams();
   const router = useRouter();
   const roomCode = params.code as string;
   const { socket, isConnected } = useSocket();
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [currentPlayer, setCurrentPlayer] = useState<string | null>(null);
+  const joinedSocketId = useRef<string | undefined>(undefined);
 
   const { data: room, isLoading } = api.game.getRoom.useQuery(
     { roomCode },
     { enabled: !!roomCode }
   );
 
+  // Check if game already started via tRPC
+  const { data: gameState } = api.game.getGameState.useQuery(
+    { roomCode },
+    { enabled: !!roomCode }
+  );
+
+  // Redirect if game is already in progress
+  useEffect(() => {
+    if (gameState && gameState.phase !== "LOBBY") {
+      router.push(`/room/${roomCode}/play`);
+    }
+  }, [gameState, roomCode, router]);
+
+  // Join room when socket connects
   useEffect(() => {
     if (!socket || !isConnected) return;
 
-    const playerName = localStorage.getItem("playerName") || "Guest";
-    socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName });
+    // Only emit JOIN once per socket connection
+    if (joinedSocketId.current !== socket.id) {
+      joinedSocketId.current = socket.id;
+      const name = localStorage.getItem("playerName") || "Guest";
+      socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName: name });
+    }
 
-    socket.on(ROOM_EVENTS.JOINED, (data) => {
-      setPlayers(data.players);
-      setCurrentPlayer(data.player.id);
+    // Always register listeners (they get cleaned up and need re-registering)
+    const handleJoined = (data: { player: { id: string } }) => {
       localStorage.setItem("playerId", data.player.id);
-    });
+    };
 
-    socket.on(ROOM_EVENTS.PLAYER_JOINED, (data) => {
-      setPlayers(data.players);
-      toast.info(`${data.player.name || data.player.guestName} joined`);
-    });
-
-    socket.on(ROOM_EVENTS.PLAYER_LEFT, (data) => {
-      setPlayers(data.players);
-    });
-
-    socket.on(ROOM_EVENTS.GAME_STARTED, () => {
+    const handleGameStarted = () => {
       router.push(`/room/${roomCode}/play`);
-    });
+    };
 
-    socket.on(ROOM_EVENTS.ERROR, (data) => {
+    const handleError = (data: { message: string }) => {
       toast.error(data.message);
-    });
+    };
+
+    socket.on(ROOM_EVENTS.JOINED, handleJoined);
+    socket.on(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
+    socket.on(ROOM_EVENTS.ERROR, handleError);
 
     return () => {
-      socket.off(ROOM_EVENTS.JOINED);
-      socket.off(ROOM_EVENTS.PLAYER_JOINED);
-      socket.off(ROOM_EVENTS.PLAYER_LEFT);
-      socket.off(ROOM_EVENTS.GAME_STARTED);
-      socket.off(ROOM_EVENTS.ERROR);
+      socket.off(ROOM_EVENTS.JOINED, handleJoined);
+      socket.off(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
+      socket.off(ROOM_EVENTS.ERROR, handleError);
     };
   }, [socket, isConnected, roomCode, router]);
 
@@ -101,52 +111,46 @@ export default function RoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-blue-900 p-4">
-      <div className="max-w-md mx-auto space-y-4">
-        {/* Room Code */}
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-sm text-muted-foreground">Room Code</p>
-            <p className="text-3xl font-mono font-bold tracking-widest">
-              {roomCode}
-            </p>
-          </CardContent>
-        </Card>
+    <div className="min-h-screen bg-blue-900 p-4 flex flex-col">
+      {/* Room Code - small text at top */}
+      <div className="text-center mb-4">
+        <span className="text-white/60 text-sm">Room </span>
+        <span className="text-white font-mono font-semibold">{roomCode}</span>
+      </div>
 
-        {/* Players */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>Players ({players.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {players.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between p-2 border rounded"
-                >
-                  <span className="font-medium">
-                    {player.name || player.guestName}
-                  </span>
-                  {player.id === currentPlayer && (
-                    <Badge variant="secondary">You</Badge>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Main content - centered */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-white/70">Waiting for host to start the game...</p>
+          <div className="flex items-center justify-center gap-2 text-white/50">
+            <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+            <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+            <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+        </div>
+      </div>
 
-        {/* Status */}
-        <Card>
-          <CardContent className="pt-6 text-center text-muted-foreground">
-            Waiting for host to start the game...
-          </CardContent>
-        </Card>
-
-        <Button variant="outline" onClick={handleLeaveRoom} className="w-full">
-          Leave Room
-        </Button>
+      {/* Leave button at bottom */}
+      <div className="mt-auto pt-4">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" className="w-full text-white/60 hover:text-white hover:bg-white/10">
+              Leave Room
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave room?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to leave this room?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleLeaveRoom}>Leave</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

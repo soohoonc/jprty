@@ -34,6 +34,7 @@ export type GamePhase =
 export interface FinalJeopardyAnswer {
   playerId: string;
   wager: number;
+  wagerSubmitted: boolean;  // Bug #3: Track submission separately from wager amount
   answer?: string;
   revealed: boolean;
 }
@@ -46,8 +47,11 @@ export interface GameState {
   roundType: RoundType;
   currentQuestion?: Question;
   currentQuestionValue?: number;
+  currentQuestionCategory?: string;  // Category name for the current question
   currentPlayerId?: string;  // Player whose turn it is (for Daily Double or answering)
   selectorPlayerId?: string; // Player who gets to select next question
+  questionAnsweredCorrectly?: boolean; // Track if current question was answered correctly
+  playersWhoAnsweredWrong: Set<string>; // Track who already got it wrong (can't buzz again)
   buzzQueue: string[];
   scores: Map<string, number>;
   roundNumber: number;
@@ -68,7 +72,16 @@ export interface GameStateSnapshot {
   roundNumber: number;
   totalRounds: number;
   scores: [string, number][];
-  board?: GameBoard;
+  board?: {
+    categories: string[];
+    grid?: Array<{
+      questionId: string;
+      value: number;
+      isAnswered: boolean;
+      isDailyDouble: boolean;
+      col: number;
+    }>;
+  };
   currentQuestion?: {
     id: string;
     clue: string;
@@ -93,6 +106,7 @@ class GameStateManager {
       phase: 'LOBBY',
       roundType: 'SINGLE_JEOPARDY',
       buzzQueue: [],
+      playersWhoAnsweredWrong: new Set(),
       scores: new Map(),
       roundNumber: 0,
       totalRounds,
@@ -109,6 +123,15 @@ class GameStateManager {
     const state = this.games.get(roomId);
     if (!state) return null;
 
+    // Flatten cells 2D array to grid for client consumption
+    const grid = state.board?.cells.flat().map(cell => ({
+      questionId: cell.questionId,
+      value: cell.value,
+      isAnswered: cell.isAnswered,
+      isDailyDouble: cell.isDailyDouble,
+      col: cell.col,
+    }));
+
     return {
       roomId: state.roomId,
       phase: state.phase,
@@ -116,10 +139,14 @@ class GameStateManager {
       roundNumber: state.roundNumber,
       totalRounds: state.totalRounds,
       scores: Array.from(state.scores.entries()),
-      board: state.board,
+      board: state.board ? {
+        categories: state.board.categories,
+        grid,
+      } : undefined,
       currentQuestion: state.currentQuestion ? {
         id: state.currentQuestion.id,
         clue: state.currentQuestion.clue,
+        category: state.currentQuestionCategory,
         value: state.currentQuestionValue,
       } : undefined,
       currentPlayerId: state.currentPlayerId,
@@ -134,10 +161,17 @@ class GameStateManager {
     this.callbacks.set(roomId, callback);
   }
 
+  hasCallback(roomId: string): boolean {
+    return this.callbacks.has(roomId);
+  }
+
   private notifyChange(state: GameState): void {
     const callback = this.callbacks.get(state.roomId);
+    console.log(`[GameState] notifyChange called for room ${state.roomId}, phase: ${state.phase}, callback exists: ${!!callback}`);
     if (callback) {
       callback(state);
+    } else {
+      console.log(`[GameState] WARNING: No callback registered for room ${state.roomId}`);
     }
   }
 
@@ -161,7 +195,9 @@ class GameStateManager {
 
     const players = await db.player.findMany({
       where: { roomId, isActive: true },
+      orderBy: { joinedAt: 'asc' }, // First player to join should select first
     });
+    console.log('[GameState] Players for selector:', players.map(p => ({ id: p.id, name: p.name })));
 
     players.forEach((p: any) => state.scores.set(p.id, 0));
 
@@ -171,6 +207,8 @@ class GameStateManager {
     // First player to join selects first
     state.selectorPlayerId = players[0]?.id;
     state.phase = 'SELECTING';
+
+    console.log('[GameState] Game started - selectorPlayerId:', state.selectorPlayerId, 'phase:', state.phase);
 
     this.notifyChange(state);
     return state;
@@ -192,7 +230,7 @@ class GameStateManager {
     state.board = board;
   }
 
-  selectQuestion(roomId: string, questionId: string, playerId: string): GameState {
+  async selectQuestion(roomId: string, questionId: string, playerId: string): Promise<GameState> {
     const state = this.games.get(roomId);
     if (!state) throw new Error('Game not found');
     if (state.phase !== 'SELECTING') throw new Error('Not in selecting phase');
@@ -208,19 +246,22 @@ class GameStateManager {
     if (!cell) throw new Error('Question not found on board');
     if (cell.isAnswered) throw new Error('Question already answered');
 
-    // Find question from database
-    // For now, we'll create a mock question - in production, fetch from DB
-    state.currentQuestion = {
-      id: questionId,
-      clue: `Question for ${questionId}`, // Should be fetched from DB
-      answer: 'Answer', // Should be fetched from DB
-      difficulty: 'medium',
-      questionSetId: '',
-    } as Question;
+    // Bug #1 Fix: Fetch question from database using the actual questionId
+    const question = await db.question.findUnique({
+      where: { id: cell.questionId },
+    });
 
+    if (!question) {
+      throw new Error(`Question not found in database: ${cell.questionId}`);
+    }
+
+    state.currentQuestion = question;
     state.currentQuestionValue = cell.value;
+    state.currentQuestionCategory = state.board?.categories[cell.col];
     state.currentPlayerId = playerId;
     state.buzzQueue = [];
+    state.questionAnsweredCorrectly = false; // Reset for new question
+    state.playersWhoAnsweredWrong = new Set(); // Reset for new question
 
     // Check if it's a Daily Double
     if (cell.isDailyDouble) {
@@ -293,6 +334,11 @@ class GameStateManager {
     const state = this.games.get(roomId);
     if (!state || state.phase !== 'BUZZING') throw new Error('Cannot buzz now');
 
+    // Can't buzz if already answered wrong for this question
+    if (state.playersWhoAnsweredWrong.has(playerId)) {
+      throw new Error('You already answered this question');
+    }
+
     if (!state.buzzQueue.includes(playerId)) {
       state.buzzQueue.push(playerId);
     }
@@ -341,8 +387,10 @@ class GameStateManager {
     if (isCorrect) {
       state.scores.set(playerId, currentScore + points);
       state.selectorPlayerId = playerId; // Correct answerer selects next
+      state.questionAnsweredCorrectly = true;
     } else {
       state.scores.set(playerId, currentScore - points);
+      state.playersWhoAnsweredWrong.add(playerId); // Track who got it wrong
     }
 
     // Record answer in database
@@ -365,17 +413,21 @@ class GameStateManager {
         this.afterReveal(roomId);
       }, GAME_CONFIG.timing.revealDelay);
     } else {
-      // Wrong answer in regular play - next person in queue or reveal
-      state.buzzQueue.shift();
-      if (state.buzzQueue.length > 0) {
-        state.currentPlayerId = state.buzzQueue[0];
-        state.phase = 'ANSWERING';
-        state.timeRemaining = GAME_CONFIG.timing.answerWindow / 1000;
-        this.setTimer(roomId, () => {
-          this.handleTimeout(roomId);
-        }, GAME_CONFIG.timing.answerWindow);
-      } else {
+      // Wrong answer in regular play
+      this.clearTimer(roomId);
+      state.buzzQueue = []; // Clear the queue
+      state.currentPlayerId = undefined;
+
+      // Check if all players have answered wrong
+      const totalPlayers = state.scores.size;
+      const wrongAnswerCount = state.playersWhoAnsweredWrong.size;
+
+      if (wrongAnswerCount >= totalPlayers) {
+        // Everyone got it wrong - reveal answer
         this.revealAnswer(roomId);
+      } else {
+        // Reopen buzzer for remaining players
+        this.openBuzzer(roomId);
       }
     }
 
@@ -430,6 +482,9 @@ class GameStateManager {
       state.board = markQuestionAnswered(state.board, state.currentQuestion.id);
     }
 
+    // If no one answered correctly, the original selector keeps control
+    // (selectorPlayerId is already set to whoever selected the question, so no change needed)
+
     // Check if round is complete
     if (isBoardComplete(state.board)) {
       this.endRound(roomId);
@@ -439,6 +494,8 @@ class GameStateManager {
       state.currentQuestion = undefined;
       state.currentPlayerId = undefined;
       state.currentWager = undefined;
+      state.questionAnsweredCorrectly = undefined; // Reset for next question
+      state.playersWhoAnsweredWrong = new Set(); // Reset for next question
       state.buzzQueue = [];
       this.notifyChange(state);
     }
@@ -486,25 +543,48 @@ class GameStateManager {
     state.phase = 'FINAL_JEOPARDY_WAGER';
     state.finalJeopardyAnswers = new Map();
 
-    // Initialize answer tracking for all players with positive scores
+    // Issue #4 Fix: Include players with $0 (>= 0 instead of > 0)
+    // Players with negative scores remain excluded per game rules
     for (const [playerId, score] of state.scores.entries()) {
-      if (score > 0) {
+      if (score >= 0) {
         state.finalJeopardyAnswers.set(playerId, {
           playerId,
           wager: 0,
+          wagerSubmitted: false,  // Bug #3: Track submission status separately
           revealed: false,
         });
       }
     }
 
-    // TODO: Load Final Jeopardy question from database
-    state.finalJeopardyQuestion = {
-      id: 'final',
-      clue: 'Final Jeopardy Question',
-      answer: 'Final Answer',
-      difficulty: 'hard',
-      questionSetId: '',
-    } as Question;
+    // Bug #2 Fix: Fetch Final Jeopardy question from database
+    // Look for questions marked as "Final Jeopardy" round type, or use a random hard question
+    const finalQuestion = await db.question.findFirst({
+      where: {
+        roundType: { contains: 'Final', mode: 'insensitive' },
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    if (finalQuestion) {
+      state.finalJeopardyQuestion = finalQuestion;
+    } else {
+      // Fallback: Get any hard difficulty question if no Final Jeopardy questions exist
+      const fallbackQuestion = await db.question.findFirst({
+        where: { difficulty: 'hard' },
+        orderBy: { id: 'asc' },
+      });
+
+      if (fallbackQuestion) {
+        state.finalJeopardyQuestion = fallbackQuestion;
+      } else {
+        // Last resort: Get any question
+        const anyQuestion = await db.question.findFirst();
+        if (!anyQuestion) {
+          throw new Error('No questions available for Final Jeopardy');
+        }
+        state.finalJeopardyQuestion = anyQuestion;
+      }
+    }
 
     this.notifyChange(state);
 
@@ -527,10 +607,11 @@ class GameStateManager {
     const validWager = Math.max(0, Math.min(wager, maxWager));
 
     playerAnswer.wager = validWager;
+    playerAnswer.wagerSubmitted = true;  // Bug #3: Mark wager as submitted
 
-    // Check if all wagers are in
+    // Bug #3 Fix: Check submission status instead of wager amount (allows $0 wagers)
     const allWagersIn = Array.from(state.finalJeopardyAnswers?.values() || [])
-      .every(a => a.wager > 0);
+      .every(a => a.wagerSubmitted);
 
     if (allWagersIn) {
       this.clearTimer(roomId);
@@ -606,6 +687,39 @@ class GameStateManager {
     setTimeout(() => {
       this.endGame(roomId);
     }, 5000);
+  }
+
+  // Selector (or host) can manually advance to next question
+  nextQuestion(roomId: string): GameState {
+    const state = this.games.get(roomId);
+    if (!state) throw new Error('Game not found');
+
+    // Clear any pending timers (e.g., reveal delay timer)
+    this.clearTimer(roomId);
+
+    // Mark current question as answered if there is one
+    if (state.currentQuestion && state.board) {
+      state.board = markQuestionAnswered(state.board, state.currentQuestion.id);
+    }
+
+    // Check if board is complete
+    if (state.board && isBoardComplete(state.board)) {
+      this.endRound(roomId);
+      return state;
+    }
+
+    // Reset state for next question
+    state.phase = 'SELECTING';
+    state.currentQuestion = undefined;
+    state.currentPlayerId = undefined;
+    state.currentWager = undefined;
+    state.questionAnsweredCorrectly = undefined;
+    state.playersWhoAnsweredWrong = new Set();
+    state.buzzQueue = [];
+    state.timeRemaining = undefined;
+
+    this.notifyChange(state);
+    return state;
   }
 
   private async endGame(roomId: string): Promise<void> {
