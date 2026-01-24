@@ -9,7 +9,6 @@
 		"check:unsafe": "biome check --write --unsafe .",
 		"check:write": "biome check --write .",
 		"dev": "next dev --turbo",
-		"postinstall": "prisma generate",
 		"preview": "next build && next start",
 		"start": "next start",
 		"typecheck": "tsc --noEmit"
