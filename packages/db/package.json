@@ -3,9 +3,6 @@
   "exports": {
     ".": "./index.ts"
   },
-  "prisma": {
-    "schema": "./prisma/schema.prisma"
-  },
   "scripts": {
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
@@ -26,3 +23,4 @@
     "zod": "^4.0.14"
   }
 }
+
