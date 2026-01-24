@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@jprty/db": "*",
+    "@jprty/shared": "*",
     "dotenv": "^17.2.1",
     "hono": "^4.6.15",
     "socket.io": "^4.8.1"

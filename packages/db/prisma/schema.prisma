@@ -24,8 +24,9 @@ model Room {
     createdAt  DateTime   @default(now()) @map("created_at")
     updatedAt  DateTime   @updatedAt @map("updated_at")
 
-    players      Player[]
-    gameSessions GameSession[]
+    players       Player[]
+    gameSessions  GameSession[]
+    configuration GameConfiguration?
 
     @@map("room")
 }
@@ -158,8 +159,10 @@ model User {
     sessions      Session[]
     accounts      Account[]
 
-    hostedRooms Room[]
-    players     Player[]
+    hostedRooms  Room[]
+    players      Player[]
+    statistics   PlayerStatistics?
+    leaderboards Leaderboard[]
 
     @@unique([email])
     @@map("user")
@@ -208,4 +211,59 @@ model Verification {
     updatedAt  DateTime? @map("updated_at")
 
     @@map("verification")
+}
+
+model GameConfiguration {
+    id                   String   @id @default(cuid())
+    roomId               String   @unique @map("room_id")
+    room                 Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+    difficulty           String   @default("MEDIUM") // EASY, MEDIUM, HARD
+    buzzWindowMs         Int      @default(5000) @map("buzz_window_ms")
+    answerWindowMs       Int      @default(30000) @map("answer_window_ms")
+    revealWindowMs       Int      @default(3000) @map("reveal_window_ms")
+    roundCount           Int      @default(1) @map("round_count")
+    questionsPerCategory Int      @default(5) @map("questions_per_category")
+    createdAt            DateTime @default(now()) @map("created_at")
+    updatedAt            DateTime @updatedAt @map("updated_at")
+
+    @@map("game_configuration")
+}
+
+model PlayerStatistics {
+    id               String   @id @default(cuid())
+    userId           String   @unique @map("user_id")
+    user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    gamesPlayed      Int      @default(0) @map("games_played")
+    gamesWon         Int      @default(0) @map("games_won")
+    totalScore       Int      @default(0) @map("total_score")
+    correctAnswers   Int      @default(0) @map("correct_answers")
+    incorrectAnswers Int      @default(0) @map("incorrect_answers")
+    fastestBuzzMs    Int?     @map("fastest_buzz_ms")
+    averageBuzzMs    Int?     @map("average_buzz_ms")
+    createdAt        DateTime @default(now()) @map("created_at")
+    updatedAt        DateTime @updatedAt @map("updated_at")
+
+    @@map("player_statistics")
+}
+
+enum LeaderboardPeriod {
+    DAILY
+    WEEKLY
+    MONTHLY
+    ALL_TIME
+}
+
+model Leaderboard {
+    id       String            @id @default(cuid())
+    userId   String            @map("user_id")
+    user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+    period   LeaderboardPeriod
+    score    Int               @default(0)
+    rank     Int?
+    gamesWon Int               @default(0) @map("games_won")
+    updatedAt DateTime         @updatedAt @map("updated_at")
+
+    @@unique([userId, period])
+    @@index([period, score])
+    @@map("leaderboard")
 }

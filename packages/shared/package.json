@@ -1,0 +1,16 @@
+{
+  "name": "@jprty/shared",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./src/index.ts",
+    "./events": "./src/events.ts",
+    "./types": "./src/types.ts",
+    "./config": "./src/config.ts"
+  },
+  "devDependencies": {
+    "@jprty/typescript-config": "*"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

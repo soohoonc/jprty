@@ -1,115 +1,297 @@
 import { Server, Socket } from 'socket.io';
+import { db } from '@jprty/db';
+import { GAME_EVENTS, GAME_CONFIG } from '@jprty/shared';
 import { roomManager } from '../game/rooms';
-import { gameState } from '../game/state';
-import { judge, EVENTS } from '../utils';
+import { gameState, GameState } from '../game/state';
 
-const BUZZ_WINDOW_DELAY = 3000;
-const ANSWER_DELAY = 10000;
+function broadcastState(io: Server, roomId: string, _state: GameState): void {
+  const snapshot = gameState.getSnapshot(roomId);
+  if (snapshot) {
+    // Transform board to frontend format
+    let transformedBoard = null;
+    if (snapshot.board) {
+      const answeredQuestions: string[] = [];
+      snapshot.board.cells.forEach((row) => {
+        row.forEach((cell) => {
+          if (cell.isAnswered) {
+            const category = snapshot.board!.categories[cell.col];
+            answeredQuestions.push(`${category}_${cell.value}`);
+          }
+        });
+      });
+      transformedBoard = {
+        categories: snapshot.board.categories,
+        answeredQuestions,
+      };
+    }
+
+    io.to(roomId).emit(GAME_EVENTS.STATE_UPDATE, {
+      ...snapshot,
+      board: transformedBoard,
+    });
+  }
+}
 
 export function game(io: Server, socket: Socket) {
-  socket.on(EVENTS.game.question_revealed, (data: { questionId: string }) => {
+  // Get current game state
+  socket.on(GAME_EVENTS.GET_STATE, () => {
     try {
       const connection = roomManager.getConnection(socket.id);
       if (!connection) throw new Error('Not in a room');
 
-      const state = gameState.selectQuestion(connection.roomId, data.questionId);
-
-      io.to(connection.roomId).emit(EVENTS.game.question_revealed, {
-        questionId: data.questionId,
-        phase: state.phase
-      });
-
-      setTimeout(() => {
-        io.to(connection.roomId).emit(EVENTS.game.buzz_window_open);
-      }, BUZZ_WINDOW_DELAY);
+      const snapshot = gameState.getSnapshot(connection.roomId);
+      socket.emit(GAME_EVENTS.STATE_UPDATE, snapshot);
     } catch (error: any) {
-      socket.emit('error', { message: error.message });
+      socket.emit(GAME_EVENTS.ERROR, { message: error.message });
     }
   });
 
-  socket.on(EVENTS.game.buzz_window_open, () => {
+  // Select a question from the board - selector player or host can select
+  socket.on(GAME_EVENTS.SELECT_QUESTION, (data: { questionId: string }) => {
+    console.log(`[GAME] Received select_question: ${data.questionId} from socket ${socket.id}`);
+    try {
+      const connection = roomManager.getConnection(socket.id);
+      console.log(`[GAME] Connection for socket ${socket.id}:`, connection);
+      if (!connection) throw new Error('Not in a room');
+
+      const game = gameState.get(connection.roomId);
+      if (!game) throw new Error('Game not found');
+
+      // Allow selection if: host OR the designated selector player
+      const isSelector = game.selectorPlayerId === connection.playerId;
+      if (!connection.isHost && !isSelector) {
+        throw new Error('Not your turn to select');
+      }
+
+      console.log(`[GAME] Calling gameState.selectQuestion with roomId: ${connection.roomId}, questionId: ${data.questionId}`);
+      const state = gameState.selectQuestion(
+        connection.roomId,
+        data.questionId,
+        connection.playerId
+      );
+      console.log(`[GAME] selectQuestion returned, phase: ${state.phase}, question:`, state.currentQuestion?.id);
+
+      // Emit appropriate event based on whether it's a Daily Double
+      if (state.phase === 'DAILY_DOUBLE') {
+        io.to(connection.roomId).emit(GAME_EVENTS.DAILY_DOUBLE, {
+          playerId: connection.playerId,
+          questionId: data.questionId,
+          maxWager: state.scores.get(connection.playerId) || GAME_CONFIG.wager.lowScoreMaxWager.SINGLE_JEOPARDY,
+        });
+      } else {
+        io.to(connection.roomId).emit(GAME_EVENTS.QUESTION_SELECTED, {
+          questionId: data.questionId,
+          question: state.currentQuestion,
+          value: state.currentQuestionValue,
+          phase: state.phase,
+        });
+
+        // Schedule buzzer open
+        setTimeout(() => {
+          const currentState = gameState.get(connection.roomId);
+          if (currentState?.phase === 'BUZZING') {
+            io.to(connection.roomId).emit(GAME_EVENTS.BUZZER_OPEN, {
+              timeRemaining: GAME_CONFIG.timing.buzzWindow / 1000,
+            });
+          }
+        }, GAME_CONFIG.timing.readingDelay);
+      }
+
+      broadcastState(io, connection.roomId, state);
+    } catch (error: any) {
+      console.error(`[GAME] Error in select_question:`, error.message, error.stack);
+      socket.emit(GAME_EVENTS.ERROR, { message: error.message });
+    }
+  });
+
+  // Submit Daily Double wager
+  socket.on(GAME_EVENTS.SUBMIT_WAGER, (data: { wager: number }) => {
     try {
       const connection = roomManager.getConnection(socket.id);
       if (!connection) throw new Error('Not in a room');
+
+      const state = gameState.submitDailyDoubleWager(
+        connection.roomId,
+        connection.playerId,
+        data.wager
+      );
+
+      io.to(connection.roomId).emit(GAME_EVENTS.QUESTION_SELECTED, {
+        questionId: state.currentQuestion?.id,
+        question: state.currentQuestion,
+        value: state.currentWager,
+        phase: state.phase,
+        isDailyDouble: true,
+      });
+
+      broadcastState(io, connection.roomId, state);
+    } catch (error: any) {
+      socket.emit(GAME_EVENTS.ERROR, { message: error.message });
+    }
+  });
+
+  // Buzz in - PLAYERS ONLY (host cannot buzz)
+  socket.on(GAME_EVENTS.BUZZ, async () => {
+    try {
+      const connection = roomManager.getConnection(socket.id);
+      if (!connection) throw new Error('Not in a room');
+
+      // Host cannot buzz - only players can
+      if (connection.isHost) {
+        throw new Error('The host cannot buzz in');
+      }
 
       const state = gameState.buzz(connection.roomId, connection.playerId);
 
-      io.to(connection.roomId).emit(EVENTS.game.player_buzzed, {
+      // Get player name from DB
+      const player = await db.player.findUnique({ where: { id: connection.playerId } });
+      const playerName = player?.name || 'Player';
+
+      io.to(connection.roomId).emit(GAME_EVENTS.PLAYER_BUZZED, {
         playerId: connection.playerId,
-        position: state.buzzQueue.length,
+        playerName,
+        position: state.buzzQueue.indexOf(connection.playerId) + 1,
         isAnswering: state.currentPlayerId === connection.playerId,
+        timeRemaining: state.timeRemaining,
       });
+
+      broadcastState(io, connection.roomId, state);
     } catch (error: any) {
-      socket.emit('error', { message: error.message });
+      socket.emit(GAME_EVENTS.ERROR, { message: error.message });
     }
   });
 
-  socket.on(EVENTS.game.player_buzzed, async (data: { answer: string }) => {
+  // Submit answer - PLAYERS ONLY (host cannot answer)
+  socket.on(GAME_EVENTS.SUBMIT_ANSWER, async (data: { answer: string }) => {
     try {
       const connection = roomManager.getConnection(socket.id);
       if (!connection) throw new Error('Not in a room');
+
+      // Host cannot answer - only players can
+      if (connection.isHost) {
+        throw new Error('The host cannot submit answers');
+      }
 
       const game = gameState.get(connection.roomId);
       if (!game || !game.currentQuestion) throw new Error('No active question');
 
-      const isCorrect = await judge(game.currentQuestion.answer, data.answer);
       const state = await gameState.submitAnswer(
         connection.roomId,
         connection.playerId,
-        data.answer,
-        isCorrect
+        data.answer
       );
 
-      io.to(connection.roomId).emit(EVENTS.game.answer_result, {
+      // Get the score change
+      const previousScore = game.scores.get(connection.playerId) || 0;
+      const newScore = state.scores.get(connection.playerId) || 0;
+      const isCorrect = newScore > previousScore;
+
+      io.to(connection.roomId).emit(GAME_EVENTS.ANSWER_RESULT, {
         playerId: connection.playerId,
+        answer: data.answer,
+        correctAnswer: state.currentQuestion?.answer,
         isCorrect,
-        scores: Array.from(state.scores.entries()),
+        pointChange: newScore - previousScore,
+        newScore,
+        phase: state.phase,
       });
 
+      // Handle phase transitions
       if (state.phase === 'REVEALING') {
         setTimeout(() => {
-          io.to(connection.roomId).emit(EVENTS.game.ready_for_next);
-        }, ANSWER_DELAY);
+          const currentState = gameState.get(connection.roomId);
+          if (currentState) {
+            broadcastState(io, connection.roomId, currentState);
+          }
+        }, GAME_CONFIG.timing.revealDelay);
+      } else if (state.phase === 'ROUND_END') {
+        io.to(connection.roomId).emit(GAME_EVENTS.ROUND_END, {
+          roundNumber: state.roundNumber,
+          scores: Array.from(state.scores.entries()),
+        });
+      } else if (state.phase === 'GAME_END') {
+        const sortedScores = Array.from(state.scores.entries())
+          .sort((a, b) => b[1] - a[1]);
+
+        io.to(connection.roomId).emit(GAME_EVENTS.GAME_END, {
+          winner: sortedScores[0],
+          finalScores: sortedScores,
+        });
+      }
+
+      broadcastState(io, connection.roomId, state);
+    } catch (error: any) {
+      socket.emit(GAME_EVENTS.ERROR, { message: error.message });
+    }
+  });
+
+  // Submit Final Jeopardy wager
+  socket.on(GAME_EVENTS.SUBMIT_FINAL_WAGER, (data: { wager: number }) => {
+    try {
+      const connection = roomManager.getConnection(socket.id);
+      if (!connection) throw new Error('Not in a room');
+
+      const state = gameState.submitFinalJeopardyWager(
+        connection.roomId,
+        connection.playerId,
+        data.wager
+      );
+
+      // Don't broadcast individual wagers - they're secret
+      socket.emit(GAME_EVENTS.STATE_UPDATE, {
+        phase: state.phase,
+        wagerSubmitted: true,
+      });
+
+      // If phase changed to answering, notify everyone
+      if (state.phase === 'FINAL_JEOPARDY_ANSWER') {
+        io.to(connection.roomId).emit(GAME_EVENTS.FINAL_JEOPARDY_START, {
+          question: state.finalJeopardyQuestion,
+          timeRemaining: GAME_CONFIG.timing.finalJeopardyAnswer / 1000,
+        });
       }
     } catch (error: any) {
-      socket.emit('error', { message: error.message });
+      socket.emit(GAME_EVENTS.ERROR, { message: error.message });
     }
   });
 
-  socket.on(EVENTS.game.answer_result, () => {
+  // Submit Final Jeopardy answer
+  socket.on(GAME_EVENTS.SUBMIT_FINAL_ANSWER, (data: { answer: string }) => {
     try {
       const connection = roomManager.getConnection(socket.id);
       if (!connection) throw new Error('Not in a room');
 
-      const state = gameState.handleTimeout(connection.roomId);
+      const state = gameState.submitFinalJeopardyAnswer(
+        connection.roomId,
+        connection.playerId,
+        data.answer
+      );
 
-      io.to(connection.roomId).emit(EVENTS.game.question_skipped, {
-        nextPlayer: state.currentPlayerId,
+      // Don't broadcast individual answers - they're secret until reveal
+      socket.emit(GAME_EVENTS.STATE_UPDATE, {
+        phase: state.phase,
+        answerSubmitted: true,
       });
+
+      // If phase changed to reveal, broadcast results
+      if (state.phase === 'FINAL_JEOPARDY_REVEAL') {
+        const answers = state.finalJeopardyAnswers
+          ? Array.from(state.finalJeopardyAnswers.entries()).map(([id, ans]) => ({
+              playerId: id,
+              wager: ans.wager,
+              answer: ans.answer,
+              revealed: ans.revealed,
+            }))
+          : [];
+
+        io.to(connection.roomId).emit(GAME_EVENTS.FINAL_JEOPARDY_REVEAL, {
+          correctAnswer: state.finalJeopardyQuestion?.answer,
+          answers,
+          finalScores: Array.from(state.scores.entries()),
+        });
+      }
     } catch (error: any) {
-      socket.emit('error', { message: error.message });
-    }
-  });
-
-  socket.on(EVENTS.game.question_skipped, () => {
-    try {
-      const connection = roomManager.getConnection(socket.id);
-      if (!connection) throw new Error('Not in a room');
-
-      const state = gameState.get(connection.roomId);
-      if (!state) throw new Error('No active game');
-
-      const winner = Array.from(state.scores.entries())
-        .sort((a, b) => b[1] - a[1])[0];
-
-      gameState.end(connection.roomId);
-
-      io.to(connection.roomId).emit(EVENTS.game.winner, {
-        winnerId: winner?.[0],
-        finalScores: Array.from(state.scores.entries()),
-      });
-    } catch (error: any) {
-      socket.emit('error', { message: error.message });
+      socket.emit(GAME_EVENTS.ERROR, { message: error.message });
     }
   });
 }

@@ -1,4 +1,4 @@
-import type { RoundType } from '@jprty/db';
+import type { RoundType } from './types';
 
 export const GAME_CONFIG = {
   categoriesPerRound: 6,
@@ -15,72 +15,28 @@ export const GAME_CONFIG = {
     SINGLE_JEOPARDY: 1,
     DOUBLE_JEOPARDY: 2,
     FINAL_JEOPARDY: 0,
-  },
+  } as Record<RoundType, number>,
 
   // Timing (in ms)
   timing: {
-    readingDelay: 3000,      // Time to read question before buzzer opens
-    buzzWindow: 5000,        // Time players have to buzz in
-    answerWindow: 15000,     // Time to answer after buzzing
-    revealDelay: 3000,       // Time showing answer before next question
-    dailyDoubleWager: 10000, // Time to place Daily Double wager
-    finalJeopardyWager: 30000, // Time to place Final Jeopardy wager
-    finalJeopardyAnswer: 30000, // Time to write Final Jeopardy answer
+    readingDelay: 3000,
+    buzzWindow: 5000,
+    answerWindow: 15000,
+    revealDelay: 3000,
+    dailyDoubleWager: 10000,
+    finalJeopardyWager: 30000,
+    finalJeopardyAnswer: 30000,
   },
 
   // Wagering rules
   wager: {
     minimumWager: 5,
-    // If score < minimum board value, can wager up to highest value on board
     lowScoreMaxWager: {
       SINGLE_JEOPARDY: 1000,
       DOUBLE_JEOPARDY: 2000,
-    },
+    } as Record<'SINGLE_JEOPARDY' | 'DOUBLE_JEOPARDY', number>,
   },
-
-  // Legacy point values (for backward compatibility)
-  pointValues: {
-    easy: 200,
-    medium: 400,
-    hard: 800,
-  },
-  doubleMultiplier: 2,
-  finalValue: 0, // Final Jeopardy value is based on wager
 } as const;
-
-export type Difficulty = 'easy' | 'medium' | 'hard';
-
-export interface QuestionSetFilter {
-  categories?: string[];
-  airDateStart?: Date;
-  airDateEnd?: Date;
-}
-
-export interface RoundEvent {
-  questionId: string;
-  playerId: string;
-  eventType: 'answered' | 'skipped' | 'timeout' | 'wager' | 'daily_double';
-  answer?: string;
-  correct?: boolean;
-  wager?: number;
-  timestamp: Date;
-}
-
-export interface BoardCell {
-  questionId: string;
-  value: number;
-  isAnswered: boolean;
-  isDailyDouble: boolean;
-  row: number;
-  col: number;
-}
-
-export interface GameBoard {
-  categories: string[];
-  cells: BoardCell[][];
-  answeredCount: number;
-  totalQuestions: number;
-}
 
 export interface RoundConfig {
   roundType: RoundType;
@@ -105,7 +61,7 @@ export function getRoundConfig(roundType: RoundType): RoundConfig {
     case 'FINAL_JEOPARDY':
       return {
         roundType,
-        values: [0], // Wager-based
+        values: [0],
         dailyDoubles: 0,
       };
     default:
@@ -124,7 +80,7 @@ export function getNextRoundType(currentRound: RoundType): RoundType | null {
     case 'DOUBLE_JEOPARDY':
       return 'FINAL_JEOPARDY';
     case 'FINAL_JEOPARDY':
-      return null; // Game over
+      return null;
     default:
       return null;
   }
@@ -135,11 +91,9 @@ export function calculateMaxWager(
   roundType: RoundType
 ): number {
   if (roundType === 'FINAL_JEOPARDY') {
-    // In Final Jeopardy, you can only wager what you have (can't go negative)
     return Math.max(0, playerScore);
   }
 
-  // For Daily Doubles
   const minBoardValue = roundType === 'DOUBLE_JEOPARDY' ? 400 : 200;
   const maxBoardValue = GAME_CONFIG.wager.lowScoreMaxWager[
     roundType as 'SINGLE_JEOPARDY' | 'DOUBLE_JEOPARDY'

@@ -7,6 +7,7 @@ export interface RoomConnection {
   socketId: string;
   playerId: string;
   roomId: string;
+  isHost: boolean;
 }
 
 class RoomManager {
@@ -38,7 +39,7 @@ class RoomManager {
       data: { hostId: player.userId },
     });
 
-    this.addConnection(hostSocketId, player.id, room.id);
+    this.addConnection(hostSocketId, player.id, room.id, true); // isHost = true
 
     return { room, player };
   }
@@ -91,10 +92,11 @@ class RoomManager {
       const room = await db.room.findUnique({
         where: { id: connection.roomId },
       });
-      if (room && !room.hostId && remainingPlayers.length > 0) {
+      const firstPlayer = remainingPlayers[0];
+      if (room && !room.hostId && firstPlayer?.userId) {
         await db.room.update({
           where: { id: connection.roomId },
-          data: { hostId: remainingPlayers[0].userId },
+          data: { hostId: firstPlayer.userId },
         });
       }
     }
@@ -113,12 +115,16 @@ class RoomManager {
       data: { isActive: true },
     });
 
-    this.addConnection(socketId, playerId, player.roomId);
+    // Check if this player was the host (compare by checking if they're first player by join time)
+    const isHost = player.room.hostId === player.userId;
+
+    this.addConnection(socketId, playerId, player.roomId, isHost);
 
     return {
       socketId,
       playerId,
       roomId: player.roomId,
+      isHost,
     };
   }
 
@@ -130,13 +136,29 @@ class RoomManager {
     return Array.from(this.roomSockets.get(roomId) || []);
   }
 
-  private addConnection(socketId: string, playerId: string, roomId: string): void {
-    this.connections.set(socketId, { socketId, playerId, roomId });
+  addConnection(socketId: string, playerId: string, roomId: string, isHost: boolean = false): void {
+    this.connections.set(socketId, { socketId, playerId, roomId, isHost });
 
     if (!this.roomSockets.has(roomId)) {
       this.roomSockets.set(roomId, new Set());
     }
     this.roomSockets.get(roomId)!.add(socketId);
+  }
+
+  getHostSocket(roomId: string): string | undefined {
+    const sockets = this.roomSockets.get(roomId);
+    if (!sockets) return undefined;
+
+    for (const socketId of sockets) {
+      const conn = this.connections.get(socketId);
+      if (conn?.isHost) return socketId;
+    }
+    return undefined;
+  }
+
+  isPlayerHost(socketId: string): boolean {
+    const connection = this.connections.get(socketId);
+    return connection?.isHost ?? false;
   }
 
   private removeConnection(socketId: string): void {
