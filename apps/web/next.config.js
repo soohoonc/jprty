@@ -5,10 +5,6 @@
 import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
-const config = {
-  outputFileTracingIncludes: {
-    "/*": ["../../packages/db/generated/**/*"],
-  },
-};
+const config = {};
 
 export default config;
