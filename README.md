@@ -68,3 +68,11 @@ Room State
 - Players (Host, Guest, Logged in, Active)
 - Game State (Pending, Round, Buzzed)
 - Room State (Waiting, Players, Etc)
+
+## SpacetimeDB migration
+
+The first hybrid SpacetimeDB migration slice is documented in `docs/spacetimedb-phase1.md`.
+
+- `spacetimedb/` contains the initial module scaffold for the live-room runtime.
+- `apps/server/src/runtime/` contains the phase-1 runtime adapter boundary that still uses Prisma + Socket.IO underneath.
+- `apps/web/src/lib/use-room-runtime.ts` is the first subscribed room-runtime consumer on the web side.

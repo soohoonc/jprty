@@ -71,10 +71,12 @@ class RoomManager {
     const connection = this.connections.get(socketId);
     if (!connection) return;
 
-    await db.player.update({
-      where: { id: connection.playerId },
-      data: { isActive: false },
-    });
+    if (!connection.isHost && connection.playerId !== 'host') {
+      await db.player.update({
+        where: { id: connection.playerId },
+        data: { isActive: false },
+      });
+    }
 
     this.removeConnection(socketId);
 
@@ -88,7 +90,7 @@ class RoomManager {
         data: { status: 'CLOSED' },
       });
     } else {
-      // Transfer host to first remaining player if needed
+      // Transfer host if the room no longer has one linked.
       const room = await db.room.findUnique({
         where: { id: connection.roomId },
       });
@@ -161,7 +163,7 @@ class RoomManager {
     return connection?.isHost ?? false;
   }
 
-  private removeConnection(socketId: string): void {
+  removeConnection(socketId: string): void {
     const connection = this.connections.get(socketId);
     if (connection) {
       this.connections.delete(socketId);
