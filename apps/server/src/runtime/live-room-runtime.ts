@@ -10,6 +10,7 @@ import type {
 } from "@jprty/shared";
 import { gameState } from "../game/state";
 import { roomManager } from "../game/rooms";
+import { gameRuntime } from "./game-runtime";
 
 type RoomRecord = Awaited<ReturnType<typeof fetchRoomById>>;
 
@@ -92,7 +93,7 @@ export class LiveRoomRuntimeService {
       players: snapshot.players.map(toLegacyPlayer),
       isHost: true,
       player,
-      gameState: this.getActiveGameState(room.id),
+      gameState: gameRuntime.buildActiveGameState(gameState.getSnapshot(room.id)),
     };
   }
 
@@ -151,7 +152,7 @@ export class LiveRoomRuntimeService {
         players: snapshot.players.map(toLegacyPlayer),
         isHost: false,
         player: toLegacyPlayer(playerPayload),
-        gameState: this.getActiveGameState(room.id),
+        gameState: gameRuntime.buildActiveGameState(gameState.getSnapshot(room.id)),
       },
     };
   }
@@ -256,36 +257,6 @@ export class LiveRoomRuntimeService {
       numPlayers: players.length,
       hostConnected: Boolean(roomManager.getHostSocket(room.id)),
       players,
-    };
-  }
-
-  private getActiveGameState(roomId: string) {
-    const state = gameState.get(roomId);
-    const board = gameState.getBoard(roomId);
-
-    if (!state || !board) {
-      return null;
-    }
-
-    const answeredQuestions: string[] = [];
-
-    board.cells.forEach((row) => {
-      row.forEach((cell) => {
-        if (cell.isUsed) {
-          const category = board.categories[cell.col];
-          answeredQuestions.push(`${category}_${cell.value}`);
-        }
-      });
-    });
-
-    return {
-      board: {
-        categories: board.categories,
-        answeredQuestions,
-      },
-      phase: state.phase,
-      currentQuestion: state.currentQuestion,
-      selectorPlayerId: state.selectorPlayerId,
     };
   }
 }

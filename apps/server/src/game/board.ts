@@ -159,35 +159,6 @@ export async function getBoardQuestions(questionSetId: string | null, roundType:
   };
 }
 
-export async function initializeRound(
-  gameSessionId: string,
-  roundNumber: number,
-  roundType: RoundType,
-  filter?: QuestionSetFilter
-): Promise<any> {
-  const questionSet = await selectQuestionSet(filter);
-
-  const round = await db.round.create({
-    data: {
-      gameSessionId,
-      roundNumber,
-      roundType,
-      questionSetId: questionSet.id,
-      events: [],
-    },
-    include: {
-      questionSet: {
-        include: {
-          categories: { include: { category: true } },
-          questions: true,
-        },
-      },
-    },
-  });
-
-  return round;
-}
-
 export function getQuestionValue(board: GameBoard, questionId: string): number {
   for (const row of board.cells) {
     for (const cell of row) {

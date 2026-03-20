@@ -1,7 +1,7 @@
 import { Server, Socket } from "socket.io";
 import { GAME_EVENTS, ROOM_EVENTS } from "@jprty/shared";
 import { gameState } from "../game/state";
-import { liveRoomRuntime } from "../runtime";
+import { gameRuntime, liveRoomRuntime } from "../runtime";
 
 function getSocketRoomId(socket: Socket) {
   const rooms = Array.from(socket.rooms).filter((roomId) => roomId !== socket.id);
@@ -84,49 +84,17 @@ export function room(io: Server, socket: Socket) {
         }
 
         if (newState.phase === "GAME_END") {
-          const sortedScores = Array.from(newState.scores.entries()).sort(
-            (a, b) => b[1] - a[1],
-          );
-          io.to(roomId).emit(GAME_EVENTS.GAME_END, {
-            winner: sortedScores[0],
-            finalScores: sortedScores,
-          });
+          io.to(roomId).emit(GAME_EVENTS.GAME_END, gameRuntime.buildGameEndPayload(newState));
         }
 
-        io.to(roomId).emit(GAME_EVENTS.STATE_UPDATE, {
-          phase: newState.phase,
-          currentPlayerId: newState.currentPlayerId,
-          selectorPlayerId: newState.selectorPlayerId,
-          timeRemaining: newState.timeRemaining,
-          correctAnswer:
-            newState.phase === "REVEALING"
-              ? newState.currentQuestion?.answer
-              : undefined,
-        });
+        io.to(roomId).emit(GAME_EVENTS.STATE_UPDATE, gameRuntime.buildIncrementalStateUpdate(newState));
       });
 
-      const state = await gameState.start(roomId);
-      const board = gameState.getBoard(roomId);
-      let transformedBoard = null;
-
-      if (board) {
-        const answeredQuestions: string[] = [];
-        board.cells.forEach((row) => {
-          row.forEach((cell) => {
-            if (cell.isUsed) {
-              const category = board.categories[cell.col];
-              answeredQuestions.push(`${category}_${cell.value}`);
-            }
-          });
-        });
-
-        transformedBoard = {
-          categories: board.categories,
-          answeredQuestions,
-        };
-      }
-
-      io.to(roomId).emit(ROOM_EVENTS.GAME_STARTED, { state, board: transformedBoard });
+      await gameState.start(roomId);
+      io.to(roomId).emit(
+        ROOM_EVENTS.GAME_STARTED,
+        gameRuntime.buildGameStarted(gameState.getSnapshot(roomId)),
+      );
     } catch (error: any) {
       console.error("room:start_game error:", error);
       socket.emit(ROOM_EVENTS.ERROR, { message: error.message });
@@ -149,34 +117,7 @@ export function room(io: Server, socket: Socket) {
         });
 
         const room = await liveRoomRuntime.getSnapshot(roomId);
-        const state = gameState.get(roomId);
-        const board = gameState.getBoard(roomId);
-
-        if (state && board) {
-          const answeredQuestions: string[] = [];
-          board.cells.forEach((row) => {
-            row.forEach((cell) => {
-              if (cell.isUsed) {
-                const category = board.categories[cell.col];
-                answeredQuestions.push(`${category}_${cell.value}`);
-              }
-            });
-          });
-
-          socket.emit(ROOM_EVENTS.STATE, {
-            room,
-            board: {
-              categories: board.categories,
-              answeredQuestions,
-            },
-            phase: state.phase,
-            currentQuestion: state.currentQuestion,
-            selectorPlayerId: state.selectorPlayerId,
-          });
-          return;
-        }
-
-        socket.emit(ROOM_EVENTS.STATE, { room, board: null, phase: "LOBBY" });
+        socket.emit(ROOM_EVENTS.STATE, gameRuntime.buildRoomState(room, gameState.getSnapshot(roomId)));
       } catch (error: any) {
         console.error("room:get_state error:", error);
         socket.emit(ROOM_EVENTS.ERROR, { message: error.message });
