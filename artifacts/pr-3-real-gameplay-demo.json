@@ -1,0 +1,237 @@
+{
+  "roomCode": "RACR",
+  "gameSession": {
+    "id": "cmnkrx4s50006herqs5ifyq6e",
+    "winnerId": "cmnkrx1id0004herqptawojyf",
+    "status": "COMPLETED",
+    "endedAt": "2026-04-04T20:19:43.070Z"
+  },
+  "players": [
+    {
+      "id": "cmnkrx1id0004herqptawojyf",
+      "name": "Ada",
+      "score": 9200
+    },
+    {
+      "id": "cmnkrx26b0005herqj2otndip",
+      "name": "Grace",
+      "score": 8000
+    }
+  ],
+  "questionsPlayed": 30,
+  "questionHistory": [
+    {
+      "questionId": "cmnjwys6s0013pgrqfkmf1s7f",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "FOOD & DRINK",
+      "value": 200
+    },
+    {
+      "questionId": "cmnjwyt4e0019pgrqm8ypn3uy",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "TECHNOLOGY",
+      "value": 200
+    },
+    {
+      "questionId": "cmnjwyuua001fpgrq5k71b05s",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "ART",
+      "value": 200
+    },
+    {
+      "questionId": "cmnjwyvx6001lpgrq3aocqsoj",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "TV SHOWS",
+      "value": 200
+    },
+    {
+      "questionId": "cmnjwyy7s001rpgrqx2a3ddru",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "MYTHOLOGY",
+      "value": 200
+    },
+    {
+      "questionId": "cmnjwyyn0001xpgrq97xf1dn9",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "HEALTH",
+      "value": 200
+    },
+    {
+      "questionId": "cmnjwysg30014pgrqllg4esxv",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "FOOD & DRINK",
+      "value": 400
+    },
+    {
+      "questionId": "cmnjwyt7x001apgrq81m8gaua",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "TECHNOLOGY",
+      "value": 400
+    },
+    {
+      "questionId": "cmnjwyv4q001gpgrquwttabcy",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "ART",
+      "value": 400
+    },
+    {
+      "questionId": "cmnjwywzb001mpgrqrtybpl9o",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "TV SHOWS",
+      "value": 400
+    },
+    {
+      "questionId": "cmnjwyyai001spgrq9dtnpq4w",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "MYTHOLOGY",
+      "value": 400
+    },
+    {
+      "questionId": "cmnjwyyra001ypgrq2ad9e14p",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "HEALTH",
+      "value": 400
+    },
+    {
+      "questionId": "cmnjwysil0015pgrqbmjkw3i7",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "FOOD & DRINK",
+      "value": 600
+    },
+    {
+      "questionId": "cmnjwytad001bpgrqh41318oy",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "TECHNOLOGY",
+      "value": 600
+    },
+    {
+      "questionId": "cmnjwyv86001hpgrqombjhzkf",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "ART",
+      "value": 600
+    },
+    {
+      "questionId": "cmnjwyxef001npgrqqc97guwl",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "TV SHOWS",
+      "value": 600
+    },
+    {
+      "questionId": "cmnjwyyb9001tpgrql9hgmal3",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "MYTHOLOGY",
+      "value": 600
+    },
+    {
+      "questionId": "cmnjwyz22001zpgrqtunl9ycn",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "HEALTH",
+      "value": 600
+    },
+    {
+      "questionId": "cmnjwysjr0016pgrqzukbpg6k",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "FOOD & DRINK",
+      "value": 800
+    },
+    {
+      "questionId": "cmnjwytdq001cpgrq92qghlwl",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "TECHNOLOGY",
+      "value": 800
+    },
+    {
+      "questionId": "cmnjwyvdv001ipgrq0yjyfbna",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "ART",
+      "value": 800
+    },
+    {
+      "questionId": "cmnjwyxro001opgrq3zrsqs30",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "TV SHOWS",
+      "value": 800
+    },
+    {
+      "questionId": "cmnjwyydu001upgrqkek3wnb0",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "MYTHOLOGY",
+      "value": 800
+    },
+    {
+      "questionId": "cmnjwyz370020pgrqenc70uaa",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip"
+    },
+    {
+      "questionId": "cmnjwyslo0017pgrqeuraxut5",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "FOOD & DRINK",
+      "value": 1000
+    },
+    {
+      "questionId": "cmnjwytt3001dpgrq5ucas2in",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "TECHNOLOGY",
+      "value": 1000
+    },
+    {
+      "questionId": "cmnjwyvia001jpgrqmxxd9hl6",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "ART",
+      "value": 1000
+    },
+    {
+      "questionId": "cmnjwyxwd001ppgrq86fzt0lp",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "TV SHOWS",
+      "value": 1000
+    },
+    {
+      "questionId": "cmnjwyyge001vpgrq1e1ayjmr",
+      "selectorPlayerId": "cmnkrx1id0004herqptawojyf",
+      "answeringPlayerId": "cmnkrx26b0005herqj2otndip",
+      "category": "MYTHOLOGY",
+      "value": 1000
+    },
+    {
+      "questionId": "cmnjwyz580021pgrq0setgb6e",
+      "selectorPlayerId": "cmnkrx26b0005herqj2otndip",
+      "answeringPlayerId": "cmnkrx1id0004herqptawojyf",
+      "category": "HEALTH",
+      "value": 1000
+    }
+  ],
+  "artifacts": {
+    "webm": "jprty-full-game-demo.webm",
+    "mp4": "jprty-full-game-demo.mp4",
+    "screenshot": "jprty-full-game-results.png",
+    "html": "jprty-full-game-demo.html"
+  }
+}
