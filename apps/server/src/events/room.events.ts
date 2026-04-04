@@ -1,4 +1,5 @@
 import { Server, Socket } from "socket.io";
+import { db } from "@jprty/db";
 import { GAME_EVENTS, ROOM_EVENTS } from "@jprty/shared";
 import { gameState } from "../game/state";
 import { gameRuntime, liveRoomRuntime } from "../runtime";
@@ -84,6 +85,15 @@ export function room(io: Server, socket: Socket) {
         }
 
         if (newState.phase === "GAME_END") {
+          void db.room
+            .update({
+              where: { id: roomId },
+              data: { status: "FINISHED" },
+            })
+            .then(() => liveRoomRuntime.syncRoomSnapshot(roomId))
+            .catch((error: unknown) => {
+              console.error("room:game_end sync error:", error);
+            });
           io.to(roomId).emit(GAME_EVENTS.GAME_END, gameRuntime.buildGameEndPayload(newState));
         }
 
@@ -91,6 +101,11 @@ export function room(io: Server, socket: Socket) {
       });
 
       await gameState.start(roomId);
+      await db.room.update({
+        where: { id: roomId },
+        data: { status: "IN_GAME" },
+      });
+      await liveRoomRuntime.syncRoomSnapshot(roomId);
       io.to(roomId).emit(
         ROOM_EVENTS.GAME_STARTED,
         gameRuntime.buildGameStarted(gameState.getSnapshot(roomId)),

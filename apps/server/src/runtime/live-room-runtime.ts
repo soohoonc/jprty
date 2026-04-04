@@ -11,6 +11,7 @@ import type {
 import { gameState } from "../game/state";
 import { roomManager } from "../game/rooms";
 import { gameRuntime } from "./game-runtime";
+import { spacetimeMirror, toMirrorPlayer, toMirrorRoom } from "./spacetimedb-mirror";
 
 type RoomRecord = Awaited<ReturnType<typeof fetchRoomById>>;
 
@@ -87,6 +88,7 @@ export class LiveRoomRuntimeService {
 
     const snapshot = await this.getSnapshot(room.id);
     const player = hostPlayer();
+    await this.syncRoom(snapshot);
 
     return {
       room: snapshot,
@@ -145,6 +147,9 @@ export class LiveRoomRuntimeService {
       throw new Error("Player was not added to the room runtime");
     }
 
+    await this.syncRoom(snapshot);
+    await this.syncPlayer(playerPayload, room.id);
+
     return {
       roomId: room.id,
       payload: {
@@ -168,6 +173,10 @@ export class LiveRoomRuntimeService {
     await syncRoomPlayerCount(connection.roomId);
 
     const snapshot = await this.getSnapshot(connection.roomId);
+    if (!connection.isHost) {
+      await this.removePlayer(connection.playerId);
+    }
+    await this.syncRoom(snapshot);
 
     return {
       room: snapshot,
@@ -236,8 +245,12 @@ export class LiveRoomRuntimeService {
     };
   }
 
+  async syncRoomSnapshot(roomId: string) {
+    await this.syncRoom(await this.getSnapshot(roomId));
+  }
+
   private toSnapshot(room: NonNullable<RoomRecord>): LiveRoomRuntimeSnapshot {
-    const players: LiveRoomRuntimePlayer[] = room.players.map((player) => ({
+    const players: LiveRoomRuntimePlayer[] = room.players.map((player: NonNullable<RoomRecord>["players"][number]) => ({
       id: player.id,
       name: player.name || undefined,
       guestName: player.name || "Guest",
@@ -258,6 +271,30 @@ export class LiveRoomRuntimeService {
       hostConnected: Boolean(roomManager.getHostSocket(room.id)),
       players,
     };
+  }
+
+  private async syncRoom(snapshot: LiveRoomRuntimeSnapshot) {
+    try {
+      await spacetimeMirror.syncRoom(toMirrorRoom(snapshot));
+    } catch (error) {
+      console.warn("[spacetimedb] failed to sync room snapshot", error);
+    }
+  }
+
+  private async syncPlayer(player: LiveRoomRuntimePlayer, roomId: string) {
+    try {
+      await spacetimeMirror.syncPlayer(toMirrorPlayer(player, roomId));
+    } catch (error) {
+      console.warn("[spacetimedb] failed to sync room player", error);
+    }
+  }
+
+  private async removePlayer(playerId: string) {
+    try {
+      await spacetimeMirror.removePlayer(playerId);
+    } catch (error) {
+      console.warn("[spacetimedb] failed to remove room player", error);
+    }
   }
 }
 
