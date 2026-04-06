@@ -86,13 +86,14 @@ export interface GameStateSnapshot {
   scores: [string, number][];
   board?: {
     categories: string[];
-    grid?: Array<{
-      questionId: string;
-      value: number;
-      isUsed: boolean;
-      isDailyDouble: boolean;
-      col: number;
-    }>;
+      grid?: Array<{
+        questionId: string;
+        value: number;
+        isUsed: boolean;
+        isDailyDouble: boolean;
+        row: number;
+        col: number;
+      }>;
   };
   currentQuestion?: {
     id: string;
@@ -155,6 +156,7 @@ class GameStateManager {
       value: cell.value,
       isUsed: cell.isUsed,
       isDailyDouble: cell.isDailyDouble,
+      row: cell.row,
       col: cell.col,
     }));
 

@@ -19,6 +19,7 @@ export interface AnswerResult {
 
 export interface GameBoard {
   categories: string[];
+  questionIds: Record<string, string>;
   answeredQuestions: Set<string>;
   values: number[];
 }
@@ -49,7 +50,14 @@ export interface GameContext {
 export type GameEvent =
   | { type: "SYNC"; phase: string; data?: Partial<GameContext> }
   | { type: "SET_IDENTITY"; playerId: string | null; isHost: boolean }
-  | { type: "QUESTION_SELECTED"; question: { id: string; clue: string }; questionId: string; value: number; isDailyDouble?: boolean }
+  | {
+      type: "QUESTION_SELECTED";
+      question: { id: string; clue: string; category?: string; value?: number };
+      questionId: string;
+      value: number;
+      category?: string;
+      isDailyDouble?: boolean;
+    }
   | { type: "BUZZER_OPEN"; timeRemaining?: number }
   | { type: "PLAYER_BUZZED"; playerId: string; playerName?: string; timeRemaining?: number }
   | { type: "ANSWER_RESULT"; isCorrect: boolean; pointChange: number; answer?: string; playerId?: string; playerName?: string; correctAnswer?: string; phase?: string }
@@ -85,8 +93,8 @@ export const gameMachine = setup({
         currentQuestion: {
           id: event.question.id,
           clue: event.question.clue,
-          category: event.questionId?.split("_")[0] || "Unknown",
-          value: event.value,
+          category: event.category || event.question.category || "Unknown",
+          value: event.question.value ?? event.value,
         },
         board: context.board ? {
           ...context.board,
@@ -222,6 +230,10 @@ export const gameMachine = setup({
         board: {
           ...event.board,
           answeredQuestions: mergedAnswered,
+          questionIds: {
+            ...(context.board?.questionIds ?? {}),
+            ...event.board.questionIds,
+          },
         },
       };
     }) },

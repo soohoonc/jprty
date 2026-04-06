@@ -4,6 +4,7 @@ import type {
   LiveRoomRuntimeSnapshot,
   RoomStatus,
 } from "@jprty/shared";
+import type { GameStateSnapshot } from "../game/state";
 
 export interface SpacetimeMirrorConfig {
   baseUrl?: string;
@@ -30,6 +31,41 @@ export interface SpacetimeMirrorPlayerRecord {
   isActive: boolean;
   score: number;
   joinedAt: string;
+}
+
+export interface SpacetimeMirrorGameStateRecord {
+  roomId: string;
+  phase: string;
+  roundType: string;
+  roundNumber: number;
+  totalRounds: number;
+  selectorPlayerId: string;
+  currentPlayerId: string;
+  currentQuestionId: string;
+  currentQuestionCategory: string;
+  currentQuestionValue: number;
+  timeRemaining: number;
+  currentWager: number;
+}
+
+export interface SpacetimeMirrorGameScoreRecord {
+  scoreId: string;
+  roomId: string;
+  playerId: string;
+  score: number;
+}
+
+export interface SpacetimeMirrorBoardCellRecord {
+  cellId: string;
+  roomId: string;
+  roundNumber: number;
+  row: number;
+  col: number;
+  category: string;
+  questionId: string;
+  value: number;
+  isUsed: boolean;
+  isDailyDouble: boolean;
 }
 
 type FetchLike = typeof fetch;
@@ -71,6 +107,42 @@ function toPlayerArgs(player: SpacetimeMirrorPlayerRecord) {
   ];
 }
 
+function toGameStateArgs(state: SpacetimeMirrorGameStateRecord) {
+  return [
+    state.roomId,
+    state.phase,
+    state.roundType,
+    state.roundNumber,
+    state.totalRounds,
+    state.selectorPlayerId,
+    state.currentPlayerId,
+    state.currentQuestionId,
+    state.currentQuestionCategory,
+    state.currentQuestionValue,
+    state.timeRemaining,
+    state.currentWager,
+  ];
+}
+
+function toGameScoreArgs(score: SpacetimeMirrorGameScoreRecord) {
+  return [score.scoreId, score.roomId, score.playerId, score.score];
+}
+
+function toBoardCellArgs(cell: SpacetimeMirrorBoardCellRecord) {
+  return [
+    cell.cellId,
+    cell.roomId,
+    cell.roundNumber,
+    cell.row,
+    cell.col,
+    cell.category,
+    cell.questionId,
+    cell.value,
+    cell.isUsed,
+    cell.isDailyDouble,
+  ];
+}
+
 export function toMirrorRoom(snapshot: LiveRoomRuntimeSnapshot): SpacetimeMirrorRoomRecord {
   return {
     roomId: snapshot.roomId,
@@ -96,6 +168,55 @@ export function toMirrorPlayer(player: LiveRoomRuntimePlayer, roomId: string): S
   };
 }
 
+export function toMirrorGameState(
+  snapshot: GameStateSnapshot,
+): SpacetimeMirrorGameStateRecord {
+  return {
+    roomId: snapshot.roomId,
+    phase: snapshot.phase,
+    roundType: snapshot.roundType,
+    roundNumber: snapshot.roundNumber,
+    totalRounds: snapshot.totalRounds,
+    selectorPlayerId: snapshot.selectorPlayerId || "",
+    currentPlayerId: snapshot.currentPlayerId || "",
+    currentQuestionId: snapshot.currentQuestion?.id || "",
+    currentQuestionCategory: snapshot.currentQuestion?.category || "",
+    currentQuestionValue: snapshot.currentQuestion?.value || 0,
+    timeRemaining: snapshot.timeRemaining ?? -1,
+    currentWager: snapshot.currentWager ?? -1,
+  };
+}
+
+export function toMirrorGameScores(
+  snapshot: GameStateSnapshot,
+): SpacetimeMirrorGameScoreRecord[] {
+  return snapshot.scores.map(([playerId, score]) => ({
+    scoreId: `${snapshot.roomId}:${playerId}`,
+    roomId: snapshot.roomId,
+    playerId,
+    score,
+  }));
+}
+
+export function toMirrorBoardCells(
+  snapshot: GameStateSnapshot,
+): SpacetimeMirrorBoardCellRecord[] {
+  return (
+    snapshot.board?.grid?.map((cell) => ({
+      cellId: `${snapshot.roomId}:${cell.row}:${cell.col}`,
+      roomId: snapshot.roomId,
+      roundNumber: snapshot.roundNumber,
+      row: cell.row,
+      col: cell.col,
+      category: snapshot.board?.categories[cell.col] || "",
+      questionId: cell.questionId,
+      value: cell.value,
+      isUsed: cell.isUsed,
+      isDailyDouble: cell.isDailyDouble,
+    })) || []
+  );
+}
+
 export class SpacetimeMirrorService {
   constructor(
     private readonly config: SpacetimeMirrorConfig = defaultConfig(),
@@ -116,6 +237,36 @@ export class SpacetimeMirrorService {
 
   async removePlayer(playerId: string) {
     return this.callReducer("remove_live_room_player", [playerId]);
+  }
+
+  async syncGameState(state: SpacetimeMirrorGameStateRecord) {
+    return this.callReducer("sync_mirrored_game_state", toGameStateArgs(state));
+  }
+
+  async syncGameScore(score: SpacetimeMirrorGameScoreRecord) {
+    return this.callReducer("sync_mirrored_game_score", toGameScoreArgs(score));
+  }
+
+  async syncBoardCell(cell: SpacetimeMirrorBoardCellRecord) {
+    return this.callReducer("sync_mirrored_game_board_cell", toBoardCellArgs(cell));
+  }
+
+  async syncGameplaySnapshot(snapshot: GameStateSnapshot | null) {
+    if (!snapshot || !this.isEnabled()) {
+      return false;
+    }
+
+    await this.syncGameState(toMirrorGameState(snapshot));
+
+    for (const score of toMirrorGameScores(snapshot)) {
+      await this.syncGameScore(score);
+    }
+
+    for (const cell of toMirrorBoardCells(snapshot)) {
+      await this.syncBoardCell(cell);
+    }
+
+    return true;
   }
 
   private async callReducer(reducer: string, args: unknown[]) {

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PR #3 Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: sans-serif;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at top, #23324a, transparent 40%),
+          linear-gradient(160deg, #08111f, #101826 60%, #05070c);
+      }
+
+      main {
+        width: min(960px, calc(100vw - 32px));
+      }
+
+      h1,
+      p {
+        color: #f3f6fb;
+      }
+
+      video {
+        width: 100%;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>PR #3 room mirror demo</h1>
+      <p>Open this file in a browser to play the MP4 without hunting for the raw asset.</p>
+      <video controls preload="metadata">
+        <source src="./pr-3-spacetimedb-room-mirror-demo.mp4" type="video/mp4" />
+      </video>
+    </main>
+  </body>
+</html>

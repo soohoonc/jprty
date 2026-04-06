@@ -26,6 +26,47 @@ pub struct LiveRoomPlayer {
     joined_at: String,
 }
 
+#[spacetimedb::table(name = mirrored_game_state, public)]
+pub struct MirroredGameState {
+    #[primary_key]
+    room_id: String,
+    phase: String,
+    round_type: String,
+    round_number: u16,
+    total_rounds: u16,
+    selector_player_id: String,
+    current_player_id: String,
+    current_question_id: String,
+    current_question_category: String,
+    current_question_value: i32,
+    time_remaining: i32,
+    current_wager: i32,
+}
+
+#[spacetimedb::table(name = mirrored_game_score, public)]
+pub struct MirroredGameScore {
+    #[primary_key]
+    score_id: String,
+    room_id: String,
+    player_id: String,
+    score: i32,
+}
+
+#[spacetimedb::table(name = mirrored_game_board_cell, public)]
+pub struct MirroredGameBoardCell {
+    #[primary_key]
+    cell_id: String,
+    room_id: String,
+    round_number: u16,
+    row: u16,
+    col: u16,
+    category: String,
+    question_id: String,
+    value: i32,
+    is_used: bool,
+    is_daily_double: bool,
+}
+
 fn validate_room_inputs(room_id: &str, room_code: &str) -> Result<(), String> {
     if room_id.trim().is_empty() {
         return Err("room_id is required".to_string());
@@ -49,6 +90,14 @@ fn validate_player_inputs(player_id: &str, room_id: &str, name: &str) -> Result<
 
     if name.trim().is_empty() {
         return Err("name is required".to_string());
+    }
+
+    Ok(())
+}
+
+fn validate_game_state_inputs(room_id: &str) -> Result<(), String> {
+    if room_id.trim().is_empty() {
+        return Err("room_id is required".to_string());
     }
 
     Ok(())
@@ -142,6 +191,128 @@ pub fn remove_live_room_player(ctx: &ReducerContext, player_id: String) -> Resul
             .player_id()
             .delete(existing_player.player_id);
     }
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn sync_mirrored_game_state(
+    ctx: &ReducerContext,
+    room_id: String,
+    phase: String,
+    round_type: String,
+    round_number: u16,
+    total_rounds: u16,
+    selector_player_id: String,
+    current_player_id: String,
+    current_question_id: String,
+    current_question_category: String,
+    current_question_value: i32,
+    time_remaining: i32,
+    current_wager: i32,
+) -> Result<(), String> {
+    validate_game_state_inputs(&room_id)?;
+
+    if ctx.db.live_room().room_id().find(room_id.clone()).is_none() {
+        return Err(format!("room {} has not been provisioned", room_id));
+    }
+
+    let next_state = MirroredGameState {
+        room_id: room_id.clone(),
+        phase,
+        round_type,
+        round_number,
+        total_rounds,
+        selector_player_id,
+        current_player_id,
+        current_question_id,
+        current_question_category,
+        current_question_value,
+        time_remaining,
+        current_wager,
+    };
+
+    if let Some(_existing_state) = ctx.db.mirrored_game_state().room_id().find(room_id) {
+        ctx.db
+            .mirrored_game_state()
+            .room_id()
+            .update(next_state);
+        return Ok(());
+    }
+
+    ctx.db.mirrored_game_state().insert(next_state);
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn sync_mirrored_game_score(
+    ctx: &ReducerContext,
+    score_id: String,
+    room_id: String,
+    player_id: String,
+    score: i32,
+) -> Result<(), String> {
+    validate_player_inputs(&player_id, &room_id, &player_id)?;
+
+    let next_score = MirroredGameScore {
+        score_id: score_id.clone(),
+        room_id,
+        player_id,
+        score,
+    };
+
+    if let Some(_existing_score) = ctx.db.mirrored_game_score().score_id().find(score_id) {
+        ctx.db
+            .mirrored_game_score()
+            .score_id()
+            .update(next_score);
+        return Ok(());
+    }
+
+    ctx.db.mirrored_game_score().insert(next_score);
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn sync_mirrored_game_board_cell(
+    ctx: &ReducerContext,
+    cell_id: String,
+    room_id: String,
+    round_number: u16,
+    row: u16,
+    col: u16,
+    category: String,
+    question_id: String,
+    value: i32,
+    is_used: bool,
+    is_daily_double: bool,
+) -> Result<(), String> {
+    validate_game_state_inputs(&room_id)?;
+
+    let next_cell = MirroredGameBoardCell {
+        cell_id: cell_id.clone(),
+        room_id,
+        round_number,
+        row,
+        col,
+        category,
+        question_id,
+        value,
+        is_used,
+        is_daily_double,
+    };
+
+    if let Some(_existing_cell) = ctx.db.mirrored_game_board_cell().cell_id().find(cell_id) {
+        ctx.db
+            .mirrored_game_board_cell()
+            .cell_id()
+            .update(next_cell);
+        return Ok(());
+    }
+
+    ctx.db.mirrored_game_board_cell().insert(next_cell);
 
     Ok(())
 }

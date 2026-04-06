@@ -7,6 +7,101 @@ import {
   getRoundConfig,
 } from './config';
 
+type BoardSourceQuestion = {
+  id: string;
+  clue: string;
+  answer: string;
+  value?: number | null;
+  difficulty?: string | null;
+  difficultyScore?: number | null;
+  tags?: Array<{ tag?: { name: string } | null }>;
+  category?: string | null;
+};
+
+function normalizeCategoryKey(value: string | null | undefined) {
+  return value
+    ?.trim()
+    .toUpperCase()
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function questionMatchesCategory(question: BoardSourceQuestion, categoryName: string) {
+  const normalizedCategory = normalizeCategoryKey(categoryName);
+  const tagNames = question.tags?.map((entry) => normalizeCategoryKey(entry.tag?.name)).filter(Boolean);
+
+  return (
+    normalizeCategoryKey(question.category) === normalizedCategory ||
+    tagNames?.includes(normalizedCategory) === true
+  );
+}
+
+function sortCategoryQuestions(a: BoardSourceQuestion, b: BoardSourceQuestion) {
+  const valueDelta = (a.value ?? Number.MAX_SAFE_INTEGER) - (b.value ?? Number.MAX_SAFE_INTEGER);
+  if (valueDelta !== 0) {
+    return valueDelta;
+  }
+
+  const difficultyDelta = (a.difficultyScore ?? Number.MAX_SAFE_INTEGER) - (b.difficultyScore ?? Number.MAX_SAFE_INTEGER);
+  if (difficultyDelta !== 0) {
+    return difficultyDelta;
+  }
+
+  return a.id.localeCompare(b.id);
+}
+
+function buildCategoryMatrix(
+  categories: string[],
+  questions: BoardSourceQuestion[],
+  numCategories: number,
+  numRows: number,
+) {
+  const selectedCategories = categories.slice(0, numCategories);
+  const categoryBuckets = selectedCategories.map((categoryName) =>
+    questions
+      .filter((question) => questionMatchesCategory(question, categoryName))
+      .sort(sortCategoryQuestions),
+  );
+  const hasTaggedCoverage = categoryBuckets.some((bucket) => bucket.length > 0);
+
+  if (!hasTaggedCoverage) {
+    return selectedCategories.map((_, col) =>
+      Array.from({ length: numRows }, (_, row) => questions[(row * numCategories) + col]),
+    );
+  }
+
+  const usedQuestionIds = new Set<string>();
+  const fallbackQuestions = questions.filter((question) => !usedQuestionIds.has(question.id));
+
+  return categoryBuckets.map((bucket) => {
+    const columnQuestions: Array<BoardSourceQuestion | undefined> = [];
+
+    for (const question of bucket) {
+      if (columnQuestions.length >= numRows) {
+        break;
+      }
+      if (usedQuestionIds.has(question.id)) {
+        continue;
+      }
+
+      usedQuestionIds.add(question.id);
+      columnQuestions.push(question);
+    }
+
+    while (columnQuestions.length < numRows) {
+      const fallback = fallbackQuestions.find((question) => !usedQuestionIds.has(question.id));
+      if (!fallback) {
+        break;
+      }
+
+      usedQuestionIds.add(fallback.id);
+      columnQuestions.push(fallback);
+    }
+
+    return columnQuestions;
+  });
+}
+
 export async function selectQuestionSet(filter?: QuestionSetFilter): Promise<any> {
   const where: any = {};
 
@@ -77,12 +172,13 @@ export function generateDailyDoublePositions(
 
 export function createGameBoard(
   categories: string[],
-  questions: any[],
+  questions: BoardSourceQuestion[],
   roundType: RoundType
 ): GameBoard {
   const config = getRoundConfig(roundType);
   const numRows = GAME_CONFIG.questionsPerCategory;
   const numCategories = Math.min(categories.length, GAME_CONFIG.categoriesPerRound);
+  const questionMatrix = buildCategoryMatrix(categories, questions, numCategories, numRows);
 
   // Generate Daily Double positions
   const dailyDoublePositions = generateDailyDoublePositions(
@@ -98,9 +194,7 @@ export function createGameBoard(
     const rowCells: BoardCell[] = [];
 
     for (let col = 0; col < numCategories; col++) {
-      // Find a question for this cell (ideally matching difficulty)
-      const questionIndex = row * numCategories + col;
-      const question = questions[questionIndex % questions.length];
+      const question = questionMatrix[col]?.[row];
 
       const isDailyDouble = dailyDoublePositions.has(`${col}-${row}`);
 
@@ -137,7 +231,19 @@ export async function getBoardQuestions(questionSetId: string | null, roundType:
         include: { category: true },
         orderBy: { order: 'asc' }
       },
-      questions: true,
+      questions: {
+        include: {
+          tags: {
+            include: {
+              tag: true,
+            },
+          },
+        },
+        orderBy: [
+          { value: 'asc' },
+          { createdAt: 'asc' },
+        ],
+      },
     },
   });
 

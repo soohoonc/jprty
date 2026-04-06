@@ -139,7 +139,13 @@ export class GameRuntimeService {
       playerId,
       questionId,
       maxWager: calculateMaxWager(playerScore, state.roundType),
-      question: state.currentQuestion,
+      question: state.currentQuestion
+        ? {
+            ...state.currentQuestion,
+            category: state.currentQuestionCategory,
+            value: state.currentQuestionValue,
+          }
+        : undefined,
       value: state.currentQuestionValue,
       category: state.currentQuestionCategory,
     };
@@ -156,10 +162,15 @@ export class GameRuntimeService {
 
     return {
       questionId,
-      question: state.currentQuestion,
+      question: {
+        ...state.currentQuestion,
+        category: state.currentQuestionCategory,
+        value: state.currentQuestionValue,
+      },
       value: options?.isDailyDouble ? state.currentWager || 0 : state.currentQuestionValue,
       phase: state.phase,
       isDailyDouble: options?.isDailyDouble,
+      category: state.currentQuestionCategory,
     };
   }
 
