@@ -3,7 +3,7 @@
   "private": "true",
   "author": "soohoonc",
   "scripts": {
-    "build": "turbo build",
+    "build": "bash ./scripts/vercel-build.sh",
     "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
