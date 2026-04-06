@@ -1,6 +1,6 @@
 import { db, Question, RoundType } from '@jprty/db';
 import {
-  initializeRound,
+  selectQuestionSet,
   getBoardQuestions,
   markQuestionUsed,
   isBoardComplete,
@@ -8,13 +8,13 @@ import {
 } from './board';
 import {
   QuestionSetFilter,
-  RoundEvent,
   GameBoard,
   GAME_CONFIG,
   getNextRoundType,
   calculateMaxWager,
 } from './config';
 import { judge } from './judge';
+import { gameHistory, type GameHistoryWriter } from './history';
 
 export type GamePhase =
   | 'LOBBY'
@@ -112,6 +112,8 @@ class GameStateManager {
   private games: Map<string, GameState> = new Map();
   private timers: Map<string, NodeJS.Timeout> = new Map();
   private callbacks: Map<string, (state: GameState) => void> = new Map();
+
+  constructor(private readonly history: GameHistoryWriter = gameHistory) {}
 
   create(roomId: string): GameState {
     const totalRounds = 1;
@@ -223,13 +225,7 @@ class GameStateManager {
       console.log('[GameState] Loaded room config:', state.timing);
     }
 
-    const session = await db.gameSession.create({
-      data: {
-        roomId,
-        status: 'ACTIVE',
-        startedAt: new Date(),
-      },
-    });
+    const session = await this.history.startSession(roomId);
 
     if (!session) throw new Error('Failed to create game session');
 
@@ -261,16 +257,17 @@ class GameStateManager {
   private async initializeRoundState(state: GameState, filter?: QuestionSetFilter): Promise<void> {
     if (!state.sessionId) throw new Error('No session');
 
-    const round = await initializeRound(
-      state.sessionId,
-      state.roundNumber,
-      state.roundType,
-      filter
-    );
+    const questionSet = await selectQuestionSet(filter);
+    const round = await this.history.createRound({
+      gameSessionId: state.sessionId,
+      roundNumber: state.roundNumber,
+      roundType: state.roundType,
+      questionSetId: questionSet.id,
+    });
     state.roundId = round.id;
 
     // Load board data
-    const { board } = await getBoardQuestions(round.questionSetId, state.roundType);
+    const { board } = await getBoardQuestions(questionSet.id, state.roundType);
     state.board = board;
   }
 
@@ -442,14 +439,14 @@ class GameStateManager {
 
     // Record answer in database
     if (state.roundId && state.currentQuestion) {
-      await this.recordAnswer(
-        state.roundId,
-        state.currentQuestion.id,
+      await this.history.recordAnswer({
+        roundId: state.roundId,
+        questionId: state.currentQuestion.id,
         playerId,
         answer,
-        isCorrect,
-        state.phase === 'DAILY_DOUBLE_ANSWER' ? state.currentWager : undefined
-      );
+        correct: isCorrect,
+        wager: state.phase === 'DAILY_DOUBLE_ANSWER' ? state.currentWager : undefined,
+      });
     }
 
     // Handle post-answer logic
@@ -774,61 +771,13 @@ class GameStateManager {
       .sort((a, b) => b[1] - a[1]);
     const winnerId = sortedScores[0]?.[0];
 
-    // Update database
-    if (state.sessionId) {
-      await db.gameSession.update({
-        where: { id: state.sessionId },
-        data: {
-          status: 'COMPLETED',
-          endedAt: new Date(),
-          winnerId,
-        },
-      });
-    }
-
-    // Persist player scores to database
-    for (const [playerId, score] of state.scores.entries()) {
-      await db.player.update({
-        where: { id: playerId },
-        data: { score },
-      });
-    }
+    await this.history.finalizeGame({
+      sessionId: state.sessionId,
+      winnerId,
+      scores: Array.from(state.scores.entries()),
+    });
 
     this.notifyChange(state);
-  }
-
-  async recordAnswer(
-    roundId: string,
-    questionId: string,
-    playerId: string,
-    answer: string,
-    correct: boolean,
-    wager?: number
-  ): Promise<void> {
-    const round = await db.round.findUnique({
-      where: { id: roundId },
-    });
-
-    if (!round) throw new Error('Round not found');
-
-    const event: RoundEvent = {
-      questionId,
-      playerId,
-      eventType: wager !== undefined ? 'daily_double' : 'answered',
-      answer,
-      correct,
-      wager,
-      timestamp: new Date(),
-    };
-
-    const currentEvents = (round as any).events || [];
-
-    await db.round.update({
-      where: { id: roundId },
-      data: {
-        events: [...currentEvents, event] as any,
-      } as any,
-    });
   }
 
   getBoard(roomId: string): GameBoard | undefined {

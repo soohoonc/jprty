@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { RoomSettings } from "@/components/game/room-settings";
 import { ROOM_EVENTS } from "@jprty/shared";
+import { useRoomRuntime } from "@/lib/use-room-runtime";
 
 export default function Home() {
   const router = useRouter();
@@ -18,7 +19,7 @@ export default function Home() {
 
   const [joinCode, setJoinCode] = useState("");
   const [playerName, setPlayerName] = useState("");
-  const socketJoined = useRef(false);
+  const joinedSocketId = useRef<string | undefined>(undefined);
 
   // View mode: null = not yet determined, 'host' or 'join'
   const [viewMode, setViewMode] = useState<'host' | 'join' | null>(null);
@@ -36,16 +37,14 @@ export default function Home() {
   const roomCode = createRoom.data?.code ?? null;
   const roomId = createRoom.data?.id ?? null;
 
-  const utils = api.useUtils();
+  const { room } = useRoomRuntime({
+    enabled: !!roomCode,
+    onPlayerJoined: (player) => {
+      toast.info(`${player.name || player.guestName} joined`);
+    },
+  });
 
-  // Get room data from React Query (including players)
-  const { data: room } = api.game.getRoom.useQuery(
-    { roomCode: roomCode! },
-    { enabled: !!roomCode }
-  );
-
-  // Players from React Query (excludes host)
-  const players = room?.players?.filter((p) => !p.userId || p.userId !== room.hostId) || [];
+  const players = room?.players ?? [];
 
   // Set initial view mode based on screen size (only once on mount)
   useEffect(() => {
@@ -65,34 +64,21 @@ export default function Home() {
   // Socket setup for host
   useEffect(() => {
     if (!socket || !isConnected || !roomCode) return;
-    if (socketJoined.current) return;
+    if (joinedSocketId.current === socket.id) return;
 
-    socketJoined.current = true;
+    joinedSocketId.current = socket.id;
     socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName: "Host", isHost: true });
-
-    const handlePlayerJoined = (data: { player: { name?: string; guestName?: string } }) => {
-      toast.info(`${data.player.name || data.player.guestName} joined`);
-      utils.game.getRoom.invalidate({ roomCode });
-    };
-
-    const handlePlayerLeft = () => {
-      utils.game.getRoom.invalidate({ roomCode });
-    };
 
     const handleGameStarted = () => {
       router.push(`/room/${roomCode}/host`);
     };
 
-    socket.on(ROOM_EVENTS.PLAYER_JOINED, handlePlayerJoined);
-    socket.on(ROOM_EVENTS.PLAYER_LEFT, handlePlayerLeft);
     socket.on(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
 
     return () => {
-      socket.off(ROOM_EVENTS.PLAYER_JOINED, handlePlayerJoined);
-      socket.off(ROOM_EVENTS.PLAYER_LEFT, handlePlayerLeft);
       socket.off(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
     };
-  }, [socket, isConnected, roomCode, router, utils]);
+  }, [socket, isConnected, roomCode, router]);
 
   const handleJoin = () => {
     if (!joinCode.trim() || !playerName.trim()) {
@@ -155,7 +141,7 @@ export default function Home() {
                     <div className="space-y-2">
                       {players.map((p) => (
                         <div key={p.id} className="flex items-center justify-between p-3 bg-blue-700 rounded">
-                          <span className="text-white font-medium">{p.name || p.user?.name}</span>
+                          <span className="text-white font-medium">{p.name || p.guestName}</span>
                           {!p.isActive && <Badge className="bg-white/20 text-white/60">Offline</Badge>}
                         </div>
                       ))}

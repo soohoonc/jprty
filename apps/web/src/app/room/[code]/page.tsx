@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { ROOM_EVENTS } from "@jprty/shared";
+import { useRoomRuntime } from "@/lib/use-room-runtime";
 
 export default function RoomPage() {
   const params = useParams();
@@ -26,6 +27,7 @@ export default function RoomPage() {
   const roomCode = params.code as string;
   const { socket, isConnected } = useSocket();
   const joinedSocketId = useRef<string | undefined>(undefined);
+  const { room: runtimeRoom, player } = useRoomRuntime({ enabled: !!roomCode && isConnected });
 
   const { data: room, isLoading } = api.game.getRoom.useQuery(
     { roomCode },
@@ -45,6 +47,14 @@ export default function RoomPage() {
     }
   }, [gameState, roomCode, router]);
 
+  useEffect(() => {
+    if (!player?.id) {
+      return;
+    }
+
+    localStorage.setItem("playerId", player.id);
+  }, [player?.id]);
+
   // Join room when socket connects
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -57,10 +67,6 @@ export default function RoomPage() {
     }
 
     // Always register listeners (they get cleaned up and need re-registering)
-    const handleJoined = (data: { player: { id: string } }) => {
-      localStorage.setItem("playerId", data.player.id);
-    };
-
     const handleGameStarted = () => {
       router.push(`/room/${roomCode}/play`);
     };
@@ -69,12 +75,10 @@ export default function RoomPage() {
       toast.error(data.message);
     };
 
-    socket.on(ROOM_EVENTS.JOINED, handleJoined);
     socket.on(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
     socket.on(ROOM_EVENTS.ERROR, handleError);
 
     return () => {
-      socket.off(ROOM_EVENTS.JOINED, handleJoined);
       socket.off(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
       socket.off(ROOM_EVENTS.ERROR, handleError);
     };
@@ -122,6 +126,11 @@ export default function RoomPage() {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center space-y-4">
           <p className="text-white/70">Waiting for host to start the game...</p>
+          {runtimeRoom && (
+            <p className="text-white/50 text-sm">
+              {runtimeRoom.numPlayers} / {runtimeRoom.maxPlayers} players joined
+            </p>
+          )}
           <div className="flex items-center justify-center gap-2 text-white/50">
             <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
             <div className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />

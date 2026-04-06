@@ -94,17 +94,34 @@ export interface JoinRoomPayload {
 }
 
 export interface JoinedRoomPayload {
+  room?: import("./runtime").LiveRoomRuntimeSnapshot;
   players: Player[];
   isHost: boolean;
   player: Player;
+  gameState?: {
+    board: {
+      categories: string[];
+      answeredQuestions: string[];
+    };
+    phase: GamePhase;
+    currentQuestion?: {
+      id: string;
+      clue: string;
+      category?: string;
+      value?: number;
+    };
+    selectorPlayerId?: string;
+  } | null;
 }
 
 export interface PlayerJoinedPayload {
+  room?: import("./runtime").LiveRoomRuntimeSnapshot;
   players: Player[];
   player: Player;
 }
 
 export interface PlayerLeftPayload {
+  room?: import("./runtime").LiveRoomRuntimeSnapshot;
   players: Player[];
   player: Partial<Player>;
 }
