@@ -74,5 +74,7 @@ Room State
 The first hybrid SpacetimeDB migration slice is documented in `docs/spacetimedb-phase1.md`.
 
 - `spacetimedb/` contains the initial module scaffold for the live-room runtime.
+- The current migration work also mirrors room creation, lobby presence, and room status transitions into SpacetimeDB through an optional server-side sync path.
+- `docs/spacetimedb-phase4-room-mirror.md` documents the current room-mirror slice and its env-gated runtime path.
 - `apps/server/src/runtime/` contains the phase-1 runtime adapter boundary that still uses Prisma + Socket.IO underneath.
 - `apps/web/src/lib/use-room-runtime.ts` is the first subscribed room-runtime consumer on the web side.

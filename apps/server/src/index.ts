@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { db } from '@jprty/db';
 import { registerEventHandlers } from './events';
 import { gameState } from './game/state';
+import { spacetimeMirror } from './runtime';
 
 dotenv.config();
 
@@ -25,6 +26,39 @@ app.use('/*', cors({
 
 app.get('/health', (c) => {
   return c.json({ status: 'ok' });
+});
+
+app.post('/api/runtime/rooms/provision', async (c) => {
+  try {
+    const body = await c.req.json<{
+      roomId?: string;
+      roomCode?: string;
+      maxPlayers?: number;
+      status?: "WAITING" | "IN_GAME" | "FINISHED" | "CLOSED";
+      phase?: string;
+      numPlayers?: number;
+      hostConnected?: boolean;
+    }>();
+
+    if (!body.roomId || !body.roomCode || !body.maxPlayers) {
+      return c.json({ error: 'Missing room provision fields' }, 400);
+    }
+
+    await spacetimeMirror.syncRoom({
+      roomId: body.roomId,
+      roomCode: body.roomCode,
+      status: body.status || 'WAITING',
+      phase: (body.phase as any) || 'LOBBY',
+      maxPlayers: body.maxPlayers,
+      numPlayers: body.numPlayers || 0,
+      hostConnected: body.hostConnected || false,
+    });
+
+    return c.json({ ok: true, enabled: spacetimeMirror.isEnabled() });
+  } catch (error) {
+    console.error('runtime:provision error:', error);
+    return c.json({ error: 'Failed to provision runtime room' }, 500);
+  }
 });
 
 // Get game state snapshot for a room

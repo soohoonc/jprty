@@ -1,12 +1,12 @@
-# SpacetimeDB Scaffold
+# SpacetimeDB Module
 
-This directory is the initial SpacetimeDB module scaffold for the jprty live-room runtime.
+This directory contains the live-room runtime module for the hybrid SpacetimeDB migration.
 
-## Scope in phase 1
+## Current scope
 
-- Define the intended live-room tables.
 - Give local development a stable `spacetimedb/` project path.
-- Keep the current app runtime on the existing Prisma + Socket.IO path.
+- Mirror the current room lifecycle into SpacetimeDB reducers.
+- Keep the current app runtime on the existing Prisma + Socket.IO path while the mirror path hardens.
 
 ## Local workflow
 
@@ -24,8 +24,15 @@ spacetime start
 spacetime publish --server local --project-path spacetimedb jprty-room-runtime
 ```
 
+## Module reducers
+
+- `sync_live_room` upserts the mirrored room snapshot.
+- `sync_live_room_player` upserts mirrored player presence rows.
+- `remove_live_room_player` deletes mirrored player presence rows.
+- `init` keeps the module publishable before app reads switch over to SpacetimeDB.
+
 ## Planned follow-up
 
-- Add reducers for room creation, membership, and presence.
 - Generate TypeScript bindings for `apps/web`.
-- Switch the server runtime adapter from the Prisma/socket bridge to SpacetimeDB.
+- Switch runtime reads from the Prisma/socket bridge to SpacetimeDB-backed subscriptions.
+- Move gameplay reducers into the module after the mirrored lobby slice is stable.

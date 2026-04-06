@@ -10,6 +10,8 @@ import type {
 } from "@jprty/shared";
 import { gameState } from "../game/state";
 import { roomManager } from "../game/rooms";
+import { gameRuntime } from "./game-runtime";
+import { spacetimeMirror, toMirrorPlayer, toMirrorRoom } from "./spacetimedb-mirror";
 
 type RoomRecord = Awaited<ReturnType<typeof fetchRoomById>>;
 
@@ -86,13 +88,14 @@ export class LiveRoomRuntimeService {
 
     const snapshot = await this.getSnapshot(room.id);
     const player = hostPlayer();
+    await this.syncRoom(snapshot);
 
     return {
       room: snapshot,
       players: snapshot.players.map(toLegacyPlayer),
       isHost: true,
       player,
-      gameState: this.getActiveGameState(room.id),
+      gameState: gameRuntime.buildActiveGameState(gameState.getSnapshot(room.id)),
     };
   }
 
@@ -144,6 +147,9 @@ export class LiveRoomRuntimeService {
       throw new Error("Player was not added to the room runtime");
     }
 
+    await this.syncRoom(snapshot);
+    await this.syncPlayer(playerPayload, room.id);
+
     return {
       roomId: room.id,
       payload: {
@@ -151,7 +157,7 @@ export class LiveRoomRuntimeService {
         players: snapshot.players.map(toLegacyPlayer),
         isHost: false,
         player: toLegacyPlayer(playerPayload),
-        gameState: this.getActiveGameState(room.id),
+        gameState: gameRuntime.buildActiveGameState(gameState.getSnapshot(room.id)),
       },
     };
   }
@@ -167,6 +173,10 @@ export class LiveRoomRuntimeService {
     await syncRoomPlayerCount(connection.roomId);
 
     const snapshot = await this.getSnapshot(connection.roomId);
+    if (!connection.isHost) {
+      await this.removePlayer(connection.playerId);
+    }
+    await this.syncRoom(snapshot);
 
     return {
       room: snapshot,
@@ -235,8 +245,12 @@ export class LiveRoomRuntimeService {
     };
   }
 
+  async syncRoomSnapshot(roomId: string) {
+    await this.syncRoom(await this.getSnapshot(roomId));
+  }
+
   private toSnapshot(room: NonNullable<RoomRecord>): LiveRoomRuntimeSnapshot {
-    const players: LiveRoomRuntimePlayer[] = room.players.map((player) => ({
+    const players: LiveRoomRuntimePlayer[] = room.players.map((player: NonNullable<RoomRecord>["players"][number]) => ({
       id: player.id,
       name: player.name || undefined,
       guestName: player.name || "Guest",
@@ -259,34 +273,28 @@ export class LiveRoomRuntimeService {
     };
   }
 
-  private getActiveGameState(roomId: string) {
-    const state = gameState.get(roomId);
-    const board = gameState.getBoard(roomId);
-
-    if (!state || !board) {
-      return null;
+  private async syncRoom(snapshot: LiveRoomRuntimeSnapshot) {
+    try {
+      await spacetimeMirror.syncRoom(toMirrorRoom(snapshot));
+    } catch (error) {
+      console.warn("[spacetimedb] failed to sync room snapshot", error);
     }
+  }
 
-    const answeredQuestions: string[] = [];
+  private async syncPlayer(player: LiveRoomRuntimePlayer, roomId: string) {
+    try {
+      await spacetimeMirror.syncPlayer(toMirrorPlayer(player, roomId));
+    } catch (error) {
+      console.warn("[spacetimedb] failed to sync room player", error);
+    }
+  }
 
-    board.cells.forEach((row) => {
-      row.forEach((cell) => {
-        if (cell.isUsed) {
-          const category = board.categories[cell.col];
-          answeredQuestions.push(`${category}_${cell.value}`);
-        }
-      });
-    });
-
-    return {
-      board: {
-        categories: board.categories,
-        answeredQuestions,
-      },
-      phase: state.phase,
-      currentQuestion: state.currentQuestion,
-      selectorPlayerId: state.selectorPlayerId,
-    };
+  private async removePlayer(playerId: string) {
+    try {
+      await spacetimeMirror.removePlayer(playerId);
+    } catch (error) {
+      console.warn("[spacetimedb] failed to remove room player", error);
+    }
   }
 }
 
