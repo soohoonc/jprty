@@ -5,8 +5,7 @@
     "build": {
       "dependsOn": [
         "^build",
-        "^db:generate",
-        "@jprty/db#db:migrate"
+        "^db:generate"
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -58,7 +57,8 @@
       "env": ["DATABASE_URL"]
     },
     "db:deploy": {
-      "cache": false
+      "cache": false,
+      "env": ["DATABASE_URL"]
     }
   }
 }
