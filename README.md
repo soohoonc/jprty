@@ -75,6 +75,24 @@ The first hybrid SpacetimeDB migration slice is documented in `docs/spacetimedb-
 
 - `spacetimedb/` contains the initial module scaffold for the live-room runtime.
 - The current migration work also mirrors room creation, lobby presence, and room status transitions into SpacetimeDB through an optional server-side sync path.
+- The current branch also mirrors authoritative gameplay snapshots, scores, and board cells into SpacetimeDB through the same env-gated path.
 - `docs/spacetimedb-phase4-room-mirror.md` documents the current room-mirror slice and its env-gated runtime path.
+- `docs/spacetimedb-phase5-gameplay-mirror.md` documents the gameplay-mirror follow-up slice.
+- `docs/spacetimedb-e2e-demo.md` documents the end-to-end demo path and the remaining hosted cutover prerequisites.
 - `apps/server/src/runtime/` contains the phase-1 runtime adapter boundary that still uses Prisma + Socket.IO underneath.
 - `apps/web/src/lib/use-room-runtime.ts` is the first subscribed room-runtime consumer on the web side.
+
+## Local Postgres
+
+- Copy `.env.example` to `.env` at the repo root.
+- Start a local PostgreSQL instance on `localhost:5432` with a `jprty` database and the `postgres` user.
+- Run `bun run --cwd packages/db db:migrate` and `bun run --cwd packages/db db:seed`.
+- Vercel builds should only generate the Prisma client. Run `bun run --cwd packages/db db:deploy` once per release from a single deploy job or operator shell instead of from the parallel build graph.
+
+The DB package now loads the repo-root `.env` directly, so package-scoped commands such as `db:seed` do not require manual shell exports first.
+
+## Demo Video
+
+- The PR #3 MP4 lives at `artifacts/pr-3-spacetimedb-room-mirror-demo.mp4`.
+- Open `artifacts/pr-3-spacetimedb-room-mirror-demo.html` in a browser for a direct local video player.
+- The full gameplay demo bundle for the current migration slice is documented in `docs/spacetimedb-e2e-demo.md`.

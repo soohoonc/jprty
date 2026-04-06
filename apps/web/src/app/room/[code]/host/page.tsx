@@ -85,13 +85,14 @@ export default function HostPage() {
                 <div className="bg-blue-800 text-white text-center p-2 text-xs font-semibold uppercase truncate">
                   {category}
                 </div>
-                {(board.values || [200, 400]).map((value) => {
-                  const questionId = `${category}_${value}`;
-                  const isAnswered = board.answeredQuestions?.has(questionId);
+                {board.values.map((value) => {
+                  const cellKey = `${category}_${value}`;
+                  const questionId = board.questionIds[cellKey];
+                  const isAnswered = questionId ? board.answeredQuestions?.has(questionId) : true;
 
                   return (
                     <div
-                      key={questionId}
+                      key={cellKey}
                       className={`w-full h-16 flex items-center justify-center text-xl font-bold ${
                         isAnswered ? "bg-blue-950 opacity-30" : "bg-blue-700"
                       }`}

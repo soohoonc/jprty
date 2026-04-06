@@ -19,6 +19,7 @@ describe("gameRuntime", () => {
             value: 200,
             isUsed: true,
             isDailyDouble: false,
+            row: 0,
             col: 0,
           },
           {
@@ -26,6 +27,7 @@ describe("gameRuntime", () => {
             value: 200,
             isUsed: false,
             isDailyDouble: false,
+            row: 0,
             col: 1,
           },
         ],

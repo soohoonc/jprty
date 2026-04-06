@@ -2,7 +2,7 @@ import { Server, Socket } from "socket.io";
 import { db } from "@jprty/db";
 import { GAME_EVENTS, ROOM_EVENTS } from "@jprty/shared";
 import { gameState } from "../game/state";
-import { gameRuntime, liveRoomRuntime } from "../runtime";
+import { gameRuntime, liveRoomRuntime, spacetimeMirror } from "../runtime";
 
 function getSocketRoomId(socket: Socket) {
   const rooms = Array.from(socket.rooms).filter((roomId) => roomId !== socket.id);
@@ -98,6 +98,9 @@ export function room(io: Server, socket: Socket) {
         }
 
         io.to(roomId).emit(GAME_EVENTS.STATE_UPDATE, gameRuntime.buildIncrementalStateUpdate(newState));
+        void spacetimeMirror.syncGameplaySnapshot(gameState.getSnapshot(roomId)).catch((error) => {
+          console.error("room:spacetimedb gameplay sync error:", error);
+        });
       });
 
       await gameState.start(roomId);

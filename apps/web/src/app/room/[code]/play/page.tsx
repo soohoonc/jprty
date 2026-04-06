@@ -126,14 +126,15 @@ export default function PlayerPage() {
             >
               {board.categories.map((category, catIdx) => (
                 <div key={category} className="flex-none w-full snap-start space-y-2">
-                  {(board.values || [200, 400]).map((value) => {
-                    const qid = `${category}_${value}`;
-                    const answered = board.answeredQuestions?.has(qid);
+                  {board.values.map((value) => {
+                    const cellKey = `${category}_${value}`;
+                    const qid = board.questionIds[cellKey];
+                    const answered = qid ? board.answeredQuestions?.has(qid) : true;
                     return (
                       <button
-                        key={qid}
-                        disabled={answered || catIdx !== categoryIdx}
-                        onClick={() => selectQuestion(qid)}
+                        key={cellKey}
+                        disabled={answered || catIdx !== categoryIdx || !qid}
+                        onClick={() => qid && selectQuestion(qid)}
                         className={`w-full h-16 flex items-center justify-center text-2xl font-bold text-yellow-400 rounded-lg transition-all ${
                           answered ? "bg-blue-950 cursor-not-allowed opacity-30" : "bg-blue-700 hover:bg-blue-600 active:scale-95"
                         }`}

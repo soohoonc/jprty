@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PR #3 real gameplay demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "IBM Plex Sans", Arial, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      video, img {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid #334155;
+        background: #020617;
+      }
+      a {
+        color: #7dd3fc;
+      }
+      .meta {
+        display: grid;
+        gap: 12px;
+        margin: 16px 0 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>PR #3 real gameplay demo</h1>
+      <p>Recorded from a live local session with two real player sockets, visible clue selection, buzzing, answer submission, score changes, and final results.</p>
+      <div class="meta">
+        <div><strong>Room:</strong> RACR</div>
+        <div><strong>Questions played:</strong> 30</div>
+        <div><strong>Summary:</strong> <a href="./pr-3-real-gameplay-demo.json">JSON metadata</a></div>
+        <div><strong>Results:</strong> <a href="./pr-3-real-gameplay-results.png">Final screenshot</a></div>
+      </div>
+      <video controls preload="metadata" src="./pr-3-real-gameplay-demo.mp4"></video>
+      <h2>Final results</h2>
+      <img src="./pr-3-real-gameplay-results.png" alt="Final results screen" />
+    </main>
+  </body>
+</html>

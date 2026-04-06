@@ -1,130 +1,177 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { db } from './index';
 
-async function seed() {
-  console.log('Seeding database...');
+type SourceQuestion = {
+  id: number;
+  question: string;
+  answer: string;
+  value: number;
+  airdate: string;
+  category: {
+    id: number;
+    title: string;
+  };
+};
 
-  // Create categories
-  const categories = await Promise.all([
-    db.category.upsert({
-      where: { name: 'History' },
-      update: {},
-      create: { name: 'History', description: 'Historical events and figures' },
-    }),
-    db.category.upsert({
-      where: { name: 'Science' },
-      update: {},
-      create: { name: 'Science', description: 'Scientific discoveries and concepts' },
-    }),
-    db.category.upsert({
-      where: { name: 'Geography' },
-      update: {},
-      create: { name: 'Geography', description: 'Places around the world' },
-    }),
-    db.category.upsert({
-      where: { name: 'Literature' },
-      update: {},
-      create: { name: 'Literature', description: 'Books and authors' },
-    }),
-    db.category.upsert({
-      where: { name: 'Pop Culture' },
-      update: {},
-      create: { name: 'Pop Culture', description: 'Movies, music, and entertainment' },
-    }),
-    db.category.upsert({
-      where: { name: 'Sports' },
-      update: {},
-      create: { name: 'Sports', description: 'Athletic competitions and players' },
-    }),
-  ]);
+type SeedPack = {
+  title: string;
+  description: string;
+  categoryOrder: string[];
+};
 
-  console.log(`Created ${categories.length} categories`);
+const QUESTION_PACKS: SeedPack[] = [
+  {
+    title: 'J-Archive Showcase Pack 1',
+    description: 'Curated real-sample clues spanning classic trivia categories.',
+    categoryOrder: ['MUSIC', 'SCIENCE', 'GEOGRAPHY', 'AMERICAN HISTORY', 'LITERATURE', 'SPORTS'],
+  },
+  {
+    title: 'J-Archive Showcase Pack 2',
+    description: 'Curated real-sample clues focused on pop culture and modern knowledge.',
+    categoryOrder: ['FOOD & DRINK', 'TECHNOLOGY', 'ART', 'TV SHOWS', 'MYTHOLOGY', 'HEALTH'],
+  },
+  {
+    title: 'J-Archive Showcase Pack 3',
+    description: 'Curated real-sample clues for space, language, games, and world trivia.',
+    categoryOrder: ['SPACE', 'LANGUAGES', 'GAMES', 'US STATES', 'BIOLOGY', 'WORLD LANDMARKS'],
+  },
+];
 
-  // Create a question set
-  const questionSet = await db.questionSet.create({
-    data: {
-      title: 'General Knowledge Pack 1',
-      description: 'A mix of trivia across various topics',
-      airDate: new Date(),
-      config: { easy: 2, medium: 2, hard: 1 },
+function normalizeTag(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function deriveDifficulty(value: number) {
+  if (value <= 400) {
+    return { difficulty: 'easy', difficultyScore: value === 200 ? 1 : 2 };
+  }
+
+  if (value === 600) {
+    return { difficulty: 'medium', difficultyScore: 3 };
+  }
+
+  return {
+    difficulty: 'hard',
+    difficultyScore: value === 800 ? 4 : 5,
+  };
+}
+
+async function loadSampleQuestions() {
+  const filePath = resolve(import.meta.dir, '../import-cli/data/jeopardy.json');
+  const content = await readFile(filePath, 'utf-8');
+  return JSON.parse(content) as SourceQuestion[];
+}
+
+async function ensureTag(name: string) {
+  return db.tag.upsert({
+    where: { name },
+    update: {},
+    create: { name },
+  });
+}
+
+async function createShowcasePack(pack: SeedPack, questions: SourceQuestion[]) {
+  const categories = pack.categoryOrder.map((categoryName) => {
+    const categoryQuestions = questions
+      .filter((question) => question.category.title === categoryName)
+      .sort((a, b) => a.value - b.value);
+
+    if (categoryQuestions.length < 5) {
+      throw new Error(`Not enough questions to seed category ${categoryName}`);
+    }
+
+    return {
+      name: categoryName,
+      questions: categoryQuestions.slice(0, 5),
+    };
+  });
+
+  await db.questionSet.deleteMany({
+    where: {
+      title: pack.title,
     },
   });
 
-  console.log(`Created question set: ${questionSet.title}`);
+  const questionSet = await db.questionSet.create({
+    data: {
+      title: pack.title,
+      description: pack.description,
+      airDate: new Date(Math.max(...categories.flatMap((category) =>
+        category.questions.map((question) => new Date(question.airdate).getTime()),
+      ))),
+      config: { source: 'jarchive-sample', questionsPerCategory: 5 },
+    },
+  });
 
-  // Link categories to question set
-  await Promise.all(
-    categories.map((cat, index) =>
-      db.questionSetCategory.create({
+  for (const [order, categorySeed] of categories.entries()) {
+    const category = await db.category.upsert({
+      where: { name: categorySeed.name },
+      update: {
+        description: `Real-sample Jeopardy clues for ${categorySeed.name}`,
+      },
+      create: {
+        name: categorySeed.name,
+        description: `Real-sample Jeopardy clues for ${categorySeed.name}`,
+      },
+    });
+
+    await ensureTag(normalizeTag(categorySeed.name));
+
+    await db.questionSetCategory.create({
+      data: {
+        questionSetId: questionSet.id,
+        categoryId: category.id,
+        order,
+      },
+    });
+
+    for (const questionSeed of categorySeed.questions) {
+      const tag = await ensureTag(normalizeTag(categorySeed.name));
+      const { difficulty, difficultyScore } = deriveDifficulty(questionSeed.value);
+
+      await db.question.create({
         data: {
+          clue: questionSeed.question,
+          answer: questionSeed.answer,
+          difficulty,
+          difficultyScore,
+          airDate: new Date(questionSeed.airdate),
+          value: questionSeed.value,
+          clueHash: `seed:${questionSeed.id}`,
+          source: 'jarchive-sample',
+          externalId: `${pack.title}:${questionSeed.id}`,
           questionSetId: questionSet.id,
-          categoryId: cat.id,
-          order: index,
+          tags: {
+            create: [{ tagId: tag.id }],
+          },
         },
-      })
-    )
-  );
+      });
+    }
+  }
 
-  // Sample questions for each category
-  const questionData = [
-    // History (5 questions)
-    { clue: 'This ship sank on its maiden voyage in 1912', answer: 'Titanic', difficulty: 'easy' },
-    { clue: 'He was the first President of the United States', answer: 'George Washington', difficulty: 'easy' },
-    { clue: 'This wall divided Berlin from 1961 to 1989', answer: 'Berlin Wall', difficulty: 'medium' },
-    { clue: 'The ancient city of Machu Picchu is located in this country', answer: 'Peru', difficulty: 'medium' },
-    { clue: 'This French emperor was exiled to the island of Elba', answer: 'Napoleon', difficulty: 'hard' },
+  return questionSet;
+}
 
-    // Science (5 questions)
-    { clue: 'This planet is known as the Red Planet', answer: 'Mars', difficulty: 'easy' },
-    { clue: 'H2O is the chemical formula for this substance', answer: 'Water', difficulty: 'easy' },
-    { clue: 'This scientist developed the theory of relativity', answer: 'Einstein', difficulty: 'medium' },
-    { clue: 'The powerhouse of the cell', answer: 'Mitochondria', difficulty: 'medium' },
-    { clue: 'This element has the atomic number 79', answer: 'Gold', difficulty: 'hard' },
+async function seed() {
+  console.log('Seeding database...');
+  const sampleQuestions = await loadSampleQuestions();
+  await db.questionSet.deleteMany({
+    where: {
+      title: 'General Knowledge Pack 1',
+    },
+  });
 
-    // Geography (5 questions)
-    { clue: 'This is the largest country by land area', answer: 'Russia', difficulty: 'easy' },
-    { clue: 'The capital of Japan', answer: 'Tokyo', difficulty: 'easy' },
-    { clue: 'This river is the longest in Africa', answer: 'Nile', difficulty: 'medium' },
-    { clue: 'The smallest country in the world', answer: 'Vatican City', difficulty: 'medium' },
-    { clue: 'This mountain range separates Europe from Asia', answer: 'Ural Mountains', difficulty: 'hard' },
+  for (const pack of QUESTION_PACKS) {
+    const questionSet = await createShowcasePack(pack, sampleQuestions);
+    console.log(`Created question set: ${questionSet.title}`);
+  }
 
-    // Literature (5 questions)
-    { clue: 'He wrote Romeo and Juliet', answer: 'Shakespeare', difficulty: 'easy' },
-    { clue: 'The boy wizard created by J.K. Rowling', answer: 'Harry Potter', difficulty: 'easy' },
-    { clue: 'This novel begins with "Call me Ishmael"', answer: 'Moby Dick', difficulty: 'medium' },
-    { clue: 'Author of 1984 and Animal Farm', answer: 'George Orwell', difficulty: 'medium' },
-    { clue: 'The Catcher in the Rye was written by this author', answer: 'J.D. Salinger', difficulty: 'hard' },
-
-    // Pop Culture (5 questions)
-    { clue: 'This superhero is known as the Dark Knight', answer: 'Batman', difficulty: 'easy' },
-    { clue: 'The band that performed "Bohemian Rhapsody"', answer: 'Queen', difficulty: 'easy' },
-    { clue: 'This movie features a shark terrorizing a beach town', answer: 'Jaws', difficulty: 'medium' },
-    { clue: 'He played Jack in Titanic', answer: 'Leonardo DiCaprio', difficulty: 'medium' },
-    { clue: 'This TV show features dragons and a battle for the Iron Throne', answer: 'Game of Thrones', difficulty: 'hard' },
-
-    // Sports (5 questions)
-    { clue: 'This sport uses a puck', answer: 'Hockey', difficulty: 'easy' },
-    { clue: 'The number of players on a basketball team on the court', answer: 'Five', difficulty: 'easy' },
-    { clue: 'He has won the most Olympic gold medals', answer: 'Michael Phelps', difficulty: 'medium' },
-    { clue: 'The country that has won the most FIFA World Cups', answer: 'Brazil', difficulty: 'medium' },
-    { clue: 'This tennis tournament is played on grass courts', answer: 'Wimbledon', difficulty: 'hard' },
-  ];
-
-  // Create questions
-  const questions = await Promise.all(
-    questionData.map((q) =>
-      db.question.create({
-        data: {
-          clue: q.clue,
-          answer: q.answer,
-          difficulty: q.difficulty,
-          questionSetId: questionSet.id,
-        },
-      })
-    )
-  );
-
-  console.log(`Created ${questions.length} questions`);
-
+  console.log(`Created ${QUESTION_PACKS.length} real-data question sets`);
   console.log('Seed complete!');
 }
 

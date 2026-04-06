@@ -113,6 +113,26 @@ describe('createGameBoard', () => {
       }
     }
   });
+
+  test('prefers questions tagged to the requested category when available', () => {
+    const taggedCategories = ['SCIENCE', 'HISTORY', 'SPORTS', 'MUSIC', 'ART', 'TECH'];
+    const taggedQuestions = taggedCategories.flatMap((category, categoryIndex) =>
+      [200, 400, 600, 800, 1000].map((value, rowIndex) => ({
+        id: `${category}-${value}`,
+        clue: `${category} clue ${rowIndex}`,
+        answer: `${category} answer ${rowIndex}`,
+        value,
+        difficulty: 'medium',
+        difficultyScore: rowIndex + 1,
+        tags: [{ tag: { name: category } }],
+      })),
+    );
+
+    const board = createGameBoard(taggedCategories, taggedQuestions, 'SINGLE_JEOPARDY');
+
+    expect(board.cells[0]![0]!.questionId).toBe('SCIENCE-200');
+    expect(board.cells[4]![5]!.questionId).toBe('TECH-1000');
+  });
 });
 
 describe('markQuestionUsed', () => {

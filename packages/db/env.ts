@@ -1,4 +1,11 @@
+import { config as loadEnv } from "dotenv";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
+
+const envFilePath = resolve(dirname(fileURLToPath(import.meta.url)), "../../.env");
+
+loadEnv({ path: envFilePath });
 
 const envSchema = z.object({
   DATABASE_URL: z.string(),

@@ -66,14 +66,21 @@ export function useGameMachine({
     if (serverState.board) {
       // Extract unique values from grid, sorted ascending
       const values = [...new Set(serverState.board.grid?.map((c) => c.value) ?? [])].sort((a, b) => a - b);
+      const questionIds = Object.fromEntries(
+        (serverState.board.grid ?? []).map((cell) => [
+          `${serverState.board!.categories[cell.col]}_${cell.value}`,
+          cell.questionId,
+        ]),
+      );
       const board: GameBoard = {
         categories: serverState.board.categories,
+        questionIds,
         answeredQuestions: new Set(
           serverState.board.grid
             ?.filter((c) => c.isUsed)
-            .map((c) => `${serverState.board!.categories[c.col]}_${c.value}`) ?? []
+            .map((c) => c.questionId) ?? []
         ),
-        values: values.length > 0 ? values : [200, 400], // Fallback for testing
+        values: values.length > 0 ? values : [200, 400, 600, 800, 1000],
       };
       send({ type: "UPDATE_BOARD", board });
     }
@@ -118,6 +125,7 @@ export function useGameMachine({
           question,
           questionId,
           value,
+          category,
           isDailyDouble: d.isDailyDouble || false,
         });
       }

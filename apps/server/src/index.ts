@@ -3,12 +3,13 @@ import { cors } from 'hono/cors';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
+import { resolve } from 'node:path';
 import { db } from '@jprty/db';
 import { registerEventHandlers } from './events';
 import { gameState } from './game/state';
 import { spacetimeMirror } from './runtime';
 
-dotenv.config();
+dotenv.config({ path: resolve(import.meta.dir, '../../../.env') });
 
 const app = new Hono();
 
@@ -88,19 +89,32 @@ const PORT = Number(process.env.PORT) || 8080;
 
 // Create HTTP server and attach Socket.io
 const httpServer = createServer(async (req, res) => {
+  const body =
+    req.method === 'GET' || req.method === 'HEAD'
+      ? undefined
+      : await new Promise<Uint8Array>((resolve, reject) => {
+          const chunks: Uint8Array[] = [];
+          req.on('data', (chunk) => {
+            chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+          });
+          req.on('end', () => resolve(Buffer.concat(chunks)));
+          req.on('error', reject);
+        });
+
   // Handle regular HTTP requests through Hono
   const response = await app.fetch(new Request(`http://localhost${req.url}`, {
     method: req.method,
     headers: req.headers as any,
+    body,
   }));
-  
+
   res.statusCode = response.status;
   response.headers.forEach((value: string, key: string) => {
     res.setHeader(key, value);
   });
-  
-  const body = await response.text();
-  res.end(body);
+
+  const responseBody = await response.text();
+  res.end(responseBody);
 });
 
 const io = new Server(httpServer, {

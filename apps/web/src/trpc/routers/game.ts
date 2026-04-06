@@ -536,6 +536,7 @@ export const gameRouter = createTRPCRouter({
             value: number;
             isUsed: boolean;
             isDailyDouble: boolean;
+            row: number;
             col: number;
           }>;
         } | undefined,
