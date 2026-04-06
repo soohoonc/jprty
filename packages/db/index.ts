@@ -2,7 +2,6 @@ import { PrismaClient } from "./generated/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { env } from "./env";
-export { ensureDatabaseSchema } from "./ensure-schema";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
