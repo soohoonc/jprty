@@ -190,7 +190,7 @@ export class LiveRoomRuntimeService {
     roomId: string,
     options: { source?: "prisma" | "spacetime" | "auto" } = {},
   ): Promise<LiveRoomRuntimeSnapshot> {
-    const source = options.source || "prisma";
+    const source = options.source || "auto";
     if (source !== "prisma" && spacetimeRead.isEnabled()) {
       try {
         const mirrored = await spacetimeRead.getRoomById(roomId);
@@ -218,7 +218,7 @@ export class LiveRoomRuntimeService {
     roomCode: string,
     options: { source?: "prisma" | "spacetime" | "auto" } = {},
   ): Promise<LiveRoomRuntimeSnapshot> {
-    const source = options.source || "prisma";
+    const source = options.source || "auto";
     if (source !== "prisma" && spacetimeRead.isEnabled()) {
       try {
         const mirrored = await spacetimeRead.getRoomByCode(roomCode);

@@ -225,6 +225,7 @@ describe("spacetimeMirror", () => {
             "player-1",
             "",
             "q-1",
+            "A clue",
             "History",
             200,
             5,

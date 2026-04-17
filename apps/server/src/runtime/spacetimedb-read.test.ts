@@ -148,6 +148,7 @@ describe("SpacetimeReadService", () => {
                   { name: "selector_player_id" },
                   { name: "current_player_id" },
                   { name: "current_question_id" },
+                  { name: "current_question_clue" },
                   { name: "current_question_category" },
                   { name: "current_question_value" },
                   { name: "time_remaining" },
@@ -163,6 +164,7 @@ describe("SpacetimeReadService", () => {
                     1,
                     1,
                     "p2",
+                    "",
                     "",
                     "",
                     "",
@@ -270,6 +272,116 @@ describe("SpacetimeReadService", () => {
       buzzQueue: [],
       timeRemaining: undefined,
       currentWager: undefined,
+    });
+  });
+
+  test("hydrates current question clue directly from mirrored game state", async () => {
+    const fetchStub = (async (_url: string | URL | Request, init?: RequestInit) => {
+      const sql = String(init?.body || "");
+
+      if (sql.includes("from mirrored_game_state")) {
+        return new Response(
+          JSON.stringify([
+            {
+              schema: {
+                elements: [
+                  { name: "room_id" },
+                  { name: "phase" },
+                  { name: "round_type" },
+                  { name: "round_number" },
+                  { name: "total_rounds" },
+                  { name: "selector_player_id" },
+                  { name: "current_player_id" },
+                  { name: "current_question_id" },
+                  { name: "current_question_clue" },
+                  { name: "current_question_category" },
+                  { name: "current_question_value" },
+                  { name: "time_remaining" },
+                  { name: "current_wager" },
+                ],
+              },
+              rows: [
+                {
+                  elements: [
+                    "room-2",
+                    "READING",
+                    "SINGLE_JEOPARDY",
+                    1,
+                    1,
+                    "p1",
+                    "p2",
+                    "q-99",
+                    "This clue came from mirrored state",
+                    "Science",
+                    400,
+                    8,
+                    -1,
+                  ],
+                },
+              ],
+              total_duration_micros: 1,
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      if (sql.includes("from mirrored_game_score")) {
+        return new Response(
+          JSON.stringify([
+            {
+              schema: {
+                elements: [{ name: "player_id" }, { name: "score" }],
+              },
+              rows: [{ elements: ["p1", 100] }, { elements: ["p2", 200] }],
+              total_duration_micros: 1,
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      if (sql.includes("from mirrored_game_board_cell")) {
+        return new Response(
+          JSON.stringify([
+            {
+              schema: {
+                elements: [
+                  { name: "question_id" },
+                  { name: "value" },
+                  { name: "is_used" },
+                  { name: "is_daily_double" },
+                  { name: "row" },
+                  { name: "col" },
+                  { name: "category" },
+                ],
+              },
+              rows: [{ elements: ["q-99", 400, true, false, 0, 0, "Science"] }],
+              total_duration_micros: 1,
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      return new Response(JSON.stringify([]), { status: 200 });
+    }) as typeof fetch;
+
+    const service = new SpacetimeReadService(
+      {
+        baseUrl: "https://stdb.example.com/",
+        database: "jprty-room-runtime",
+        readsEnabled: true,
+      },
+      fetchStub,
+    );
+
+    const snapshot = await service.getGameSnapshotByRoomId("room-2");
+    expect(snapshot?.currentQuestion).toEqual({
+      id: "q-99",
+      clue: "This clue came from mirrored state",
+      category: "Science",
+      value: 400,
     });
   });
 });

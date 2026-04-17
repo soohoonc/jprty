@@ -42,6 +42,7 @@ export interface SpacetimeMirrorGameStateRecord {
   selectorPlayerId: string;
   currentPlayerId: string;
   currentQuestionId: string;
+  currentQuestionClue: string;
   currentQuestionCategory: string;
   currentQuestionValue: number;
   timeRemaining: number;
@@ -117,6 +118,7 @@ function toGameStateArgs(state: SpacetimeMirrorGameStateRecord) {
     state.selectorPlayerId,
     state.currentPlayerId,
     state.currentQuestionId,
+    state.currentQuestionClue,
     state.currentQuestionCategory,
     state.currentQuestionValue,
     state.timeRemaining,
@@ -184,6 +186,7 @@ export function toMirrorGameState(
     selectorPlayerId: snapshot.selectorPlayerId || "",
     currentPlayerId: snapshot.currentPlayerId || "",
     currentQuestionId: snapshot.currentQuestion?.id || "",
+    currentQuestionClue: snapshot.currentQuestion?.clue || "",
     currentQuestionCategory: snapshot.currentQuestion?.category || "",
     currentQuestionValue: snapshot.currentQuestion?.value || 0,
     timeRemaining: snapshot.timeRemaining ?? -1,

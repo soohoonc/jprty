@@ -1,4 +1,3 @@
-import { db } from "@jprty/db";
 import type { LiveRoomRuntimePlayer, LiveRoomRuntimeSnapshot } from "@jprty/shared";
 import type { GameStateSnapshot } from "../game/state";
 
@@ -161,7 +160,7 @@ export class SpacetimeReadService {
 
   async getGameSnapshotByRoomId(roomId: string): Promise<GameStateSnapshot | null> {
     const gameStateRows = await this.query(
-      `select room_id, phase, round_type, round_number, total_rounds, selector_player_id, current_player_id, current_question_id, current_question_category, current_question_value, time_remaining, current_wager from mirrored_game_state where room_id = '${escapeSqlString(roomId)}' limit 1`,
+      `select room_id, phase, round_type, round_number, total_rounds, selector_player_id, current_player_id, current_question_id, current_question_clue, current_question_category, current_question_value, time_remaining, current_wager from mirrored_game_state where room_id = '${escapeSqlString(roomId)}' limit 1`,
     );
     const stateRow = gameStateRows[0];
     if (!stateRow) {
@@ -176,14 +175,7 @@ export class SpacetimeReadService {
     );
 
     const currentQuestionId = coerceString(stateRow.current_question_id);
-    let currentQuestionClue = "";
-    if (currentQuestionId) {
-      const question = await db.question.findUnique({
-        where: { id: currentQuestionId },
-        select: { clue: true },
-      });
-      currentQuestionClue = question?.clue || "";
-    }
+    const currentQuestionClue = coerceString(stateRow.current_question_clue);
 
     const categoriesByColumn = new Map<number, string>();
     for (const row of boardRows) {
