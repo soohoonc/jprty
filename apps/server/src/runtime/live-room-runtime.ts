@@ -12,6 +12,7 @@ import { gameState } from "../game/state";
 import { roomManager } from "../game/rooms";
 import { gameRuntime } from "./game-runtime";
 import { spacetimeMirror, toMirrorPlayer, toMirrorRoom } from "./spacetimedb-mirror";
+import { spacetimeRead } from "./spacetimedb-read";
 
 type RoomRecord = Awaited<ReturnType<typeof fetchRoomById>>;
 
@@ -185,7 +186,25 @@ export class LiveRoomRuntimeService {
     };
   }
 
-  async getSnapshot(roomId: string): Promise<LiveRoomRuntimeSnapshot> {
+  async getSnapshot(
+    roomId: string,
+    options: { source?: "prisma" | "spacetime" | "auto" } = {},
+  ): Promise<LiveRoomRuntimeSnapshot> {
+    const source = options.source || "prisma";
+    if (source !== "prisma" && spacetimeRead.isEnabled()) {
+      try {
+        const mirrored = await spacetimeRead.getRoomById(roomId);
+        if (mirrored) {
+          return mirrored;
+        }
+      } catch (error) {
+        console.warn("[spacetimedb] failed to read room snapshot", error);
+      }
+      if (source === "spacetime") {
+        throw new Error("Room not found");
+      }
+    }
+
     const room = await fetchRoomById(roomId);
 
     if (!room) {
@@ -195,7 +214,25 @@ export class LiveRoomRuntimeService {
     return this.toSnapshot(room);
   }
 
-  async getSnapshotByCode(roomCode: string): Promise<LiveRoomRuntimeSnapshot> {
+  async getSnapshotByCode(
+    roomCode: string,
+    options: { source?: "prisma" | "spacetime" | "auto" } = {},
+  ): Promise<LiveRoomRuntimeSnapshot> {
+    const source = options.source || "prisma";
+    if (source !== "prisma" && spacetimeRead.isEnabled()) {
+      try {
+        const mirrored = await spacetimeRead.getRoomByCode(roomCode);
+        if (mirrored) {
+          return mirrored;
+        }
+      } catch (error) {
+        console.warn("[spacetimedb] failed to read room snapshot by code", error);
+      }
+      if (source === "spacetime") {
+        throw new Error("Room not found");
+      }
+    }
+
     const room = await fetchRoomByCode(roomCode);
 
     if (!room) {
