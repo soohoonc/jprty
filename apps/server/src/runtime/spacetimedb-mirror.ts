@@ -128,6 +128,10 @@ function toGameScoreArgs(score: SpacetimeMirrorGameScoreRecord) {
   return [score.scoreId, score.roomId, score.playerId, score.score];
 }
 
+function toGameScoreId(roomId: string, playerId: string) {
+  return `${roomId}:${playerId}`;
+}
+
 function toBoardCellArgs(cell: SpacetimeMirrorBoardCellRecord) {
   return [
     cell.cellId,
@@ -191,7 +195,7 @@ export function toMirrorGameScores(
   snapshot: GameStateSnapshot,
 ): SpacetimeMirrorGameScoreRecord[] {
   return snapshot.scores.map(([playerId, score]) => ({
-    scoreId: `${snapshot.roomId}:${playerId}`,
+    scoreId: toGameScoreId(snapshot.roomId, playerId),
     roomId: snapshot.roomId,
     playerId,
     score,
@@ -245,6 +249,10 @@ export class SpacetimeMirrorService {
 
   async syncGameScore(score: SpacetimeMirrorGameScoreRecord) {
     return this.callReducer("sync_mirrored_game_score", toGameScoreArgs(score));
+  }
+
+  async removeGameScore(roomId: string, playerId: string) {
+    return this.callReducer("remove_mirrored_game_score", [toGameScoreId(roomId, playerId)]);
   }
 
   async syncBoardCell(cell: SpacetimeMirrorBoardCellRecord) {

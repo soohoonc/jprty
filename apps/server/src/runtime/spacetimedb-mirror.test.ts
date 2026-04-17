@@ -84,6 +84,7 @@ describe("spacetimeMirror", () => {
     );
 
     await service.removePlayer("player-1");
+    await service.removeGameScore("room-1", "player-1");
     await service.syncGameState(
       toMirrorGameState({
         roomId: "room-1",
@@ -194,6 +195,17 @@ describe("spacetimeMirror", () => {
             authorization: "Bearer secret-token",
           },
           body: JSON.stringify(["player-1"]),
+        },
+      },
+      {
+        url: "https://stdb.example.com/v1/database/jprty-room-runtime/call/remove_mirrored_game_score",
+        init: {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: "Bearer secret-token",
+          },
+          body: JSON.stringify(["room-1:player-1"]),
         },
       },
       {

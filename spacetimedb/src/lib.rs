@@ -276,6 +276,22 @@ pub fn sync_mirrored_game_score(
 }
 
 #[spacetimedb::reducer]
+pub fn remove_mirrored_game_score(ctx: &ReducerContext, score_id: String) -> Result<(), String> {
+    if score_id.trim().is_empty() {
+        return Err("score_id is required".to_string());
+    }
+
+    if let Some(existing_score) = ctx.db.mirrored_game_score().score_id().find(score_id) {
+        ctx.db
+            .mirrored_game_score()
+            .score_id()
+            .delete(existing_score.score_id);
+    }
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn sync_mirrored_game_board_cell(
     ctx: &ReducerContext,
     cell_id: String,

@@ -174,7 +174,7 @@ export class LiveRoomRuntimeService {
 
     const snapshot = await this.getSnapshot(connection.roomId);
     if (!connection.isHost) {
-      await this.removePlayer(connection.playerId);
+      await this.removePlayer(connection.playerId, connection.roomId);
     }
     await this.syncRoom(snapshot);
 
@@ -289,9 +289,10 @@ export class LiveRoomRuntimeService {
     }
   }
 
-  private async removePlayer(playerId: string) {
+  private async removePlayer(playerId: string, roomId: string) {
     try {
       await spacetimeMirror.removePlayer(playerId);
+      await spacetimeMirror.removeGameScore(roomId, playerId);
     } catch (error) {
       console.warn("[spacetimedb] failed to remove room player", error);
     }
