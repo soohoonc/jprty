@@ -4,10 +4,9 @@ import { Server } from 'socket.io';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
 import { resolve } from 'node:path';
-import { db } from '@jprty/db';
 import { registerEventHandlers } from './events';
 import { gameState } from './game/state';
-import { spacetimeMirror } from './runtime';
+import { liveRoomRuntime, spacetimeMirror, spacetimeRead } from './runtime';
 
 dotenv.config({ path: resolve(import.meta.dir, '../../../.env') });
 
@@ -66,15 +65,29 @@ app.post('/api/runtime/rooms/provision', async (c) => {
 app.get('/api/game-state/:roomCode', async (c) => {
   const roomCode = c.req.param('roomCode').toUpperCase();
 
-  const room = await db.room.findUnique({
-    where: { code: roomCode },
-  });
+  let roomSnapshot;
+  try {
+    roomSnapshot = await liveRoomRuntime.getSnapshotByCode(roomCode, { source: "auto" });
+  } catch {
+    roomSnapshot = null;
+  }
 
-  if (!room) {
+  if (!roomSnapshot) {
     return c.json({ error: 'Room not found' }, 404);
   }
 
-  const snapshot = gameState.getSnapshot(room.id);
+  let snapshot = null;
+  if (spacetimeRead.isEnabled()) {
+    try {
+      snapshot = await spacetimeRead.getGameSnapshotByRoomId(roomSnapshot.roomId);
+    } catch (error) {
+      console.warn("[spacetimedb] failed to read gameplay snapshot", error);
+    }
+  }
+
+  if (!snapshot) {
+    snapshot = gameState.getSnapshot(roomSnapshot.roomId);
+  }
 
   if (!snapshot) {
     return c.json({ error: 'Game not started' }, 404);

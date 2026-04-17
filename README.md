@@ -76,6 +76,7 @@ The first hybrid SpacetimeDB migration slice is documented in `docs/spacetimedb-
 - `spacetimedb/` contains the initial module scaffold for the live-room runtime.
 - The current migration work also mirrors room creation, lobby presence, and room status transitions into SpacetimeDB through an optional server-side sync path.
 - The current branch also mirrors authoritative gameplay snapshots, scores, and board cells into SpacetimeDB through the same env-gated path.
+- With `SPACETIMEDB_READS_ENABLED=true`, runtime room/game snapshot reads switch to SpaceTimeDB first (with fallback to the legacy bridge).
 - `docs/spacetimedb-phase4-room-mirror.md` documents the current room-mirror slice and its env-gated runtime path.
 - `docs/spacetimedb-phase5-gameplay-mirror.md` documents the gameplay-mirror follow-up slice.
 - `docs/spacetimedb-e2e-demo.md` documents the end-to-end demo path and the remaining hosted cutover prerequisites.

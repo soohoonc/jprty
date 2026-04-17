@@ -31,6 +31,7 @@ For the earlier room-mirror-only slice, the small proof video still lives at `ar
    - start a local node with `spacetime start`
    - publish the module with `spacetime publish --server local --project-path spacetimedb jprty-room-runtime`
    - set `SPACETIMEDB_URL`, `SPACETIMEDB_DATABASE`, and optionally `SPACETIMEDB_TOKEN`
+   - set `SPACETIMEDB_READS_ENABLED=true` to exercise SpaceTimeDB-backed runtime reads
 6. Start the web app with `bun run --cwd apps/web dev`.
 7. Start the game server with `bun run --cwd apps/server dev`.
 8. Record a fresh gameplay run with `bun run artifacts/record-full-game-demo.ts`.

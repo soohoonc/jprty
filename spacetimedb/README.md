@@ -32,6 +32,7 @@ spacetime publish --server local --project-path spacetimedb jprty-room-runtime
 - `remove_live_room_player` deletes mirrored player presence rows.
 - `sync_mirrored_game_state` upserts the current gameplay snapshot for a room.
 - `sync_mirrored_game_score` upserts one mirrored player score row.
+- `remove_mirrored_game_score` deletes one mirrored player score row.
 - `sync_mirrored_game_board_cell` upserts one mirrored board-cell row.
 - `init` keeps the module publishable before app reads switch over to SpacetimeDB.
 

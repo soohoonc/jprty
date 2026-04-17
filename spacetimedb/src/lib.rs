@@ -37,6 +37,7 @@ pub struct MirroredGameState {
     selector_player_id: String,
     current_player_id: String,
     current_question_id: String,
+    current_question_clue: String,
     current_question_category: String,
     current_question_value: i32,
     time_remaining: i32,
@@ -206,6 +207,7 @@ pub fn sync_mirrored_game_state(
     selector_player_id: String,
     current_player_id: String,
     current_question_id: String,
+    current_question_clue: String,
     current_question_category: String,
     current_question_value: i32,
     time_remaining: i32,
@@ -226,6 +228,7 @@ pub fn sync_mirrored_game_state(
         selector_player_id,
         current_player_id,
         current_question_id,
+        current_question_clue,
         current_question_category,
         current_question_value,
         time_remaining,
@@ -271,6 +274,22 @@ pub fn sync_mirrored_game_score(
     }
 
     ctx.db.mirrored_game_score().insert(next_score);
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn remove_mirrored_game_score(ctx: &ReducerContext, score_id: String) -> Result<(), String> {
+    if score_id.trim().is_empty() {
+        return Err("score_id is required".to_string());
+    }
+
+    if let Some(existing_score) = ctx.db.mirrored_game_score().score_id().find(score_id) {
+        ctx.db
+            .mirrored_game_score()
+            .score_id()
+            .delete(existing_score.score_id);
+    }
 
     Ok(())
 }

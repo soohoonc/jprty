@@ -42,6 +42,7 @@ export interface SpacetimeMirrorGameStateRecord {
   selectorPlayerId: string;
   currentPlayerId: string;
   currentQuestionId: string;
+  currentQuestionClue: string;
   currentQuestionCategory: string;
   currentQuestionValue: number;
   timeRemaining: number;
@@ -117,6 +118,7 @@ function toGameStateArgs(state: SpacetimeMirrorGameStateRecord) {
     state.selectorPlayerId,
     state.currentPlayerId,
     state.currentQuestionId,
+    state.currentQuestionClue,
     state.currentQuestionCategory,
     state.currentQuestionValue,
     state.timeRemaining,
@@ -126,6 +128,10 @@ function toGameStateArgs(state: SpacetimeMirrorGameStateRecord) {
 
 function toGameScoreArgs(score: SpacetimeMirrorGameScoreRecord) {
   return [score.scoreId, score.roomId, score.playerId, score.score];
+}
+
+function toGameScoreId(roomId: string, playerId: string) {
+  return `${roomId}:${playerId}`;
 }
 
 function toBoardCellArgs(cell: SpacetimeMirrorBoardCellRecord) {
@@ -180,6 +186,7 @@ export function toMirrorGameState(
     selectorPlayerId: snapshot.selectorPlayerId || "",
     currentPlayerId: snapshot.currentPlayerId || "",
     currentQuestionId: snapshot.currentQuestion?.id || "",
+    currentQuestionClue: snapshot.currentQuestion?.clue || "",
     currentQuestionCategory: snapshot.currentQuestion?.category || "",
     currentQuestionValue: snapshot.currentQuestion?.value || 0,
     timeRemaining: snapshot.timeRemaining ?? -1,
@@ -191,7 +198,7 @@ export function toMirrorGameScores(
   snapshot: GameStateSnapshot,
 ): SpacetimeMirrorGameScoreRecord[] {
   return snapshot.scores.map(([playerId, score]) => ({
-    scoreId: `${snapshot.roomId}:${playerId}`,
+    scoreId: toGameScoreId(snapshot.roomId, playerId),
     roomId: snapshot.roomId,
     playerId,
     score,
@@ -245,6 +252,10 @@ export class SpacetimeMirrorService {
 
   async syncGameScore(score: SpacetimeMirrorGameScoreRecord) {
     return this.callReducer("sync_mirrored_game_score", toGameScoreArgs(score));
+  }
+
+  async removeGameScore(roomId: string, playerId: string) {
+    return this.callReducer("remove_mirrored_game_score", [toGameScoreId(roomId, playerId)]);
   }
 
   async syncBoardCell(cell: SpacetimeMirrorBoardCellRecord) {
