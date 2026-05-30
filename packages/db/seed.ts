@@ -2,41 +2,32 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { db } from './index';
 
-type SourceQuestion = {
-  id: number;
-  question: string;
-  answer: string;
-  value: number;
-  airdate: string;
-  category: {
-    id: number;
-    title: string;
-  };
-};
-
-type SeedPack = {
+type SeedPackDefinition = {
   title: string;
   description: string;
-  categoryOrder: string[];
+  categories: Array<{
+    slug: string;
+    name: string;
+    questions: Array<{
+      clue: string;
+      answer: string;
+      choices: string[];
+    }>;
+  }>;
 };
 
-const QUESTION_PACKS: SeedPack[] = [
-  {
-    title: 'J-Archive Showcase Pack 1',
-    description: 'Curated real-sample clues spanning classic trivia categories.',
-    categoryOrder: ['MUSIC', 'SCIENCE', 'GEOGRAPHY', 'AMERICAN HISTORY', 'LITERATURE', 'SPORTS'],
-  },
-  {
-    title: 'J-Archive Showcase Pack 2',
-    description: 'Curated real-sample clues focused on pop culture and modern knowledge.',
-    categoryOrder: ['FOOD & DRINK', 'TECHNOLOGY', 'ART', 'TV SHOWS', 'MYTHOLOGY', 'HEALTH'],
-  },
-  {
-    title: 'J-Archive Showcase Pack 3',
-    description: 'Curated real-sample clues for space, language, games, and world trivia.',
-    categoryOrder: ['SPACE', 'LANGUAGES', 'GAMES', 'US STATES', 'BIOLOGY', 'WORLD LANDMARKS'],
-  },
-];
+type OpenTriviaSeedData = {
+  source: {
+    name: string;
+    url: string;
+    license: string;
+    licenseUrl: string;
+    generatedAt: string;
+  };
+  packs: SeedPackDefinition[];
+};
+
+const CLUE_VALUES = [200, 400, 600, 800, 1000] as const;
 
 function normalizeTag(value: string) {
   return value
@@ -61,10 +52,10 @@ function deriveDifficulty(value: number) {
   };
 }
 
-async function loadSampleQuestions() {
-  const filePath = resolve(import.meta.dir, '../import-cli/data/jeopardy.json');
+async function loadOpenTriviaSeedData() {
+  const filePath = resolve(import.meta.dir, './data/open-trivia-showcase.json');
   const content = await readFile(filePath, 'utf-8');
-  return JSON.parse(content) as SourceQuestion[];
+  return JSON.parse(content) as OpenTriviaSeedData;
 }
 
 async function ensureTag(name: string) {
@@ -75,22 +66,7 @@ async function ensureTag(name: string) {
   });
 }
 
-async function createShowcasePack(pack: SeedPack, questions: SourceQuestion[]) {
-  const categories = pack.categoryOrder.map((categoryName) => {
-    const categoryQuestions = questions
-      .filter((question) => question.category.title === categoryName)
-      .sort((a, b) => a.value - b.value);
-
-    if (categoryQuestions.length < 5) {
-      throw new Error(`Not enough questions to seed category ${categoryName}`);
-    }
-
-    return {
-      name: categoryName,
-      questions: categoryQuestions.slice(0, 5),
-    };
-  });
-
+async function createShowcasePack(pack: SeedPackDefinition, metadata: OpenTriviaSeedData['source']) {
   await db.questionSet.deleteMany({
     where: {
       title: pack.title,
@@ -101,26 +77,36 @@ async function createShowcasePack(pack: SeedPack, questions: SourceQuestion[]) {
     data: {
       title: pack.title,
       description: pack.description,
-      airDate: new Date(Math.max(...categories.flatMap((category) =>
-        category.questions.map((question) => new Date(question.airdate).getTime()),
-      ))),
-      config: { source: 'jarchive-sample', questionsPerCategory: 5 },
+      airDate: new Date(metadata.generatedAt),
+      config: {
+        source: metadata.name,
+        sourceUrl: metadata.url,
+        sourceLicense: metadata.license,
+        sourceLicenseUrl: metadata.licenseUrl,
+        questionsPerCategory: 5,
+      },
     },
   });
 
-  for (const [order, categorySeed] of categories.entries()) {
+  for (const [order, categorySeed] of pack.categories.entries()) {
+    if (categorySeed.questions.length < 5) {
+      throw new Error(`Not enough questions to seed category ${categorySeed.name}`);
+    }
+
     const category = await db.category.upsert({
       where: { name: categorySeed.name },
       update: {
-        description: `Real-sample Jeopardy clues for ${categorySeed.name}`,
+        description: `OpenTriviaQA seeded clues for ${categorySeed.name}`,
       },
       create: {
         name: categorySeed.name,
-        description: `Real-sample Jeopardy clues for ${categorySeed.name}`,
+        description: `OpenTriviaQA seeded clues for ${categorySeed.name}`,
       },
     });
 
-    await ensureTag(normalizeTag(categorySeed.name));
+    const categoryTag = await ensureTag(normalizeTag(categorySeed.name));
+    const slugTag = await ensureTag(normalizeTag(categorySeed.slug));
+    const tagIds = Array.from(new Set([categoryTag.id, slugTag.id]));
 
     await db.questionSetCategory.create({
       data: {
@@ -130,24 +116,24 @@ async function createShowcasePack(pack: SeedPack, questions: SourceQuestion[]) {
       },
     });
 
-    for (const questionSeed of categorySeed.questions) {
-      const tag = await ensureTag(normalizeTag(categorySeed.name));
-      const { difficulty, difficultyScore } = deriveDifficulty(questionSeed.value);
+    for (const [index, questionSeed] of categorySeed.questions.slice(0, 5).entries()) {
+      const value = CLUE_VALUES[index]!;
+      const { difficulty, difficultyScore } = deriveDifficulty(value);
 
       await db.question.create({
         data: {
-          clue: questionSeed.question,
+          clue: questionSeed.clue,
           answer: questionSeed.answer,
           difficulty,
           difficultyScore,
-          airDate: new Date(questionSeed.airdate),
-          value: questionSeed.value,
-          clueHash: `seed:${questionSeed.id}`,
-          source: 'jarchive-sample',
-          externalId: `${pack.title}:${questionSeed.id}`,
+          airDate: new Date(metadata.generatedAt),
+          value,
+          clueHash: `seed:${categorySeed.slug}:${index}:${normalizeTag(questionSeed.clue)}`,
+          source: 'open-trivia-qa',
+          externalId: `${pack.title}:${categorySeed.slug}:${index}`,
           questionSetId: questionSet.id,
           tags: {
-            create: [{ tagId: tag.id }],
+            create: tagIds.map((tagId) => ({ tagId })),
           },
         },
       });
@@ -159,19 +145,22 @@ async function createShowcasePack(pack: SeedPack, questions: SourceQuestion[]) {
 
 async function seed() {
   console.log('Seeding database...');
-  const sampleQuestions = await loadSampleQuestions();
+  const openTriviaData = await loadOpenTriviaSeedData();
+
   await db.questionSet.deleteMany({
     where: {
       title: 'General Knowledge Pack 1',
     },
   });
 
-  for (const pack of QUESTION_PACKS) {
-    const questionSet = await createShowcasePack(pack, sampleQuestions);
+  for (const pack of openTriviaData.packs) {
+    const questionSet = await createShowcasePack(pack, openTriviaData.source);
     console.log(`Created question set: ${questionSet.title}`);
   }
 
-  console.log(`Created ${QUESTION_PACKS.length} real-data question sets`);
+  console.log(
+    `Created ${openTriviaData.packs.length} OpenTriviaQA question sets (${openTriviaData.source.license})`,
+  );
   console.log('Seed complete!');
 }
 

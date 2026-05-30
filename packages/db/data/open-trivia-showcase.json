@@ -1,0 +1,1021 @@
+{
+  "source": {
+    "name": "OpenTriviaQA",
+    "url": "https://github.com/uberspot/OpenTriviaQA",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "generatedAt": "2026-05-30T18:17:02.807Z"
+  },
+  "packs": [
+    {
+      "title": "OpenTriviaQA Showcase Pack 1",
+      "description": "General knowledge pack seeded from OpenTriviaQA for classic quiz-night topics.",
+      "categories": [
+        {
+          "slug": "science-technology",
+          "name": "SCIENCE TECHNOLOGY",
+          "questions": [
+            {
+              "clue": "Immanuel Kant criticized Emanuel Swedenborg and termed him a “spook hunter”.",
+              "answer": "True",
+              "choices": [
+                "True",
+                "False"
+              ]
+            },
+            {
+              "clue": "Clouds are made up of these.",
+              "answer": "Water droplets and ice crystals",
+              "choices": [
+                "Carbon atoms",
+                "Water droplets and ice crystals",
+                "Oxygen ions",
+                "Dust mites"
+              ]
+            },
+            {
+              "clue": "This formation is a conical hill or mountain. It is formed by mantle material being pressed through an opening in the Earths crust.",
+              "answer": "A volcano",
+              "choices": [
+                "A volcano",
+                "A hill",
+                "An earthquake",
+                "A geyser"
+              ]
+            },
+            {
+              "clue": "Japan suffers from this event very often. It is the sudden, light or violent movement of the earths surface caused by the release of energy in the earths crust.",
+              "answer": "Earthquake",
+              "choices": [
+                "Volcano",
+                "Earthquake",
+                "Tide",
+                "Tsunami"
+              ]
+            },
+            {
+              "clue": "It is the only continent that does not have land areas below sea level.",
+              "answer": "Antarctica",
+              "choices": [
+                "Australia",
+                "South America",
+                "Antarctica",
+                "Arctica"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "geography",
+          "name": "GEOGRAPHY",
+          "questions": [
+            {
+              "clue": "What is the capital of Afghanistan?",
+              "answer": "Kabul",
+              "choices": [
+                "Tirana",
+                "Kabul",
+                "Dushanbe",
+                "Tashkent"
+              ]
+            },
+            {
+              "clue": "What is the capital of Australia?",
+              "answer": "Canberra",
+              "choices": [
+                "Canberra",
+                "Sydney",
+                "Melbourne",
+                "Ottawa"
+              ]
+            },
+            {
+              "clue": "What is the capital of Belgium?",
+              "answer": "Brussels",
+              "choices": [
+                "Amsterdam",
+                "Luxemburg",
+                "Brussels",
+                "Stockholm"
+              ]
+            },
+            {
+              "clue": "What is the capital of Greece?",
+              "answer": "Athens",
+              "choices": [
+                "Ankara",
+                "Athens",
+                "Sofia",
+                "Thessaloniki"
+              ]
+            },
+            {
+              "clue": "What is the capital of Italy?",
+              "answer": "Rome",
+              "choices": [
+                "Venice",
+                "Rome",
+                "Naples",
+                "Milan"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "history",
+          "name": "HISTORY",
+          "questions": [
+            {
+              "clue": "In which US state is the active Mount Rainier volcano located?",
+              "answer": "Washington",
+              "choices": [
+                "Michigan",
+                "Ohio",
+                "Washington",
+                "New York"
+              ]
+            },
+            {
+              "clue": "In 1990, this 5000 year old body was found in the Alps. Scientists discovered some tattoos on his leg which indicated that acupuncture was used as far back as the Copper-stone Age.",
+              "answer": "Oetzi",
+              "choices": [
+                "Big Foot",
+                "Sasquatch",
+                "Nessie",
+                "Oetzi"
+              ]
+            },
+            {
+              "clue": "After unsuccessful  talks about oil production and debt repayment, Iraq occupied Kuwait.  In January 1991 the US launched an air attack against military targets in Iraq and Kuwait in this operation.",
+              "answer": "Desert Storm",
+              "choices": [
+                "Matador",
+                "BOLERO",
+                "Determined Force",
+                "Desert Storm"
+              ]
+            },
+            {
+              "clue": "It is the process of producing identical copies of a DNA segment asexually.  In 1996 the first successful one of an animal was made. The animals name was Dolly.  Dolly later died, but Richard Seed announced that he intended try it on humans.",
+              "answer": "Cloning",
+              "choices": [
+                "Organ Transplant",
+                "Cloning",
+                "Bloodless Surgery",
+                "Laser Surgery"
+              ]
+            },
+            {
+              "clue": "This kind of music became largely popular in Europe and America in the 1990s. It is a melodic, free form combination between techno and house, having hypnotic qualities. The first distinctive track of this kind was Age Of Love, released in 1990.",
+              "answer": "Trance",
+              "choices": [
+                "Electro",
+                "Trance",
+                "Techno",
+                "Dance"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "literature",
+          "name": "LITERATURE",
+          "questions": [
+            {
+              "clue": "What does the word cretin refer to?",
+              "answer": "An idiot",
+              "choices": [
+                "Cyst on the brain stem",
+                "None of these",
+                "An idiot",
+                "Swelling of the cerebrum caused by spinal fluid"
+              ]
+            },
+            {
+              "clue": "Leaves of Grass",
+              "answer": "Walt Whitman",
+              "choices": [
+                "Carl Sandberg",
+                "T.S. Eliot",
+                "Robert Frost",
+                "Walt Whitman"
+              ]
+            },
+            {
+              "clue": "At The Mountains of Madness",
+              "answer": "H.P. Lovecraft",
+              "choices": [
+                "H.P. Lovecraft",
+                "Peter Straub",
+                "Edgar Allan Poe",
+                "C.S. Lewis"
+              ]
+            },
+            {
+              "clue": "Ape and Essance; Eyeless in Gaza; Point Counter Point",
+              "answer": "Aldous Huxley",
+              "choices": [
+                "J.D. Salinger",
+                "Aldous Huxley",
+                "Maya Angelou",
+                "William Butler Yeatts"
+              ]
+            },
+            {
+              "clue": "1984; Animal Farm",
+              "answer": "George Orwell",
+              "choices": [
+                "Herman Hesse",
+                "Rudyard Kipling",
+                "George Orwell",
+                "Aldous Huxley"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "music",
+          "name": "MUSIC",
+          "questions": [
+            {
+              "clue": "The controversial lyrics of this song by The Rolling Stones include, Its Down to me, the way she talks when shes spoken to",
+              "answer": "Under My Thumb",
+              "choices": [
+                "Heart of Stone",
+                "Under My Thumb",
+                "Play With Fire",
+                "Its All Over Now"
+              ]
+            },
+            {
+              "clue": "Mick Jagger sings Baby, baby, theres fever in the funk house now on this song.",
+              "answer": "Tumbling Dice",
+              "choices": [
+                "Tumbling Dice",
+                "Gimme Shelter",
+                "Street Fighting Man",
+                "Jumpin Jack Flash"
+              ]
+            },
+            {
+              "clue": "Lose Your Dreams and you will lose your mind are lyrics from this 1967 hit by The Rolling Stones.",
+              "answer": "Ruby Tuesday",
+              "choices": [
+                "As Tears Go By",
+                "(I Cant Get No) Satisfaction",
+                "Shes A Rainbow",
+                "Ruby Tuesday"
+              ]
+            },
+            {
+              "clue": "Part of this song by The Rolling Stones goes, We decided that we would have a soda - my favorite flavor, cherry red?",
+              "answer": "You Cant Always Get What You Want",
+              "choices": [
+                "Jumpin Jack Flash",
+                "Hot Stuff",
+                "Mothers Little Helper",
+                "You Cant Always Get What You Want"
+              ]
+            },
+            {
+              "clue": "The lyrics of this song by the Rolling Stones include the phrase Rape, murder!",
+              "answer": "Gimme Shelter",
+              "choices": [
+                "Sympathy for the Devil",
+                "Street Fighting Man",
+                "Harlem Shuffle",
+                "Gimme Shelter"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "sports",
+          "name": "SPORTS",
+          "questions": [
+            {
+              "clue": "What science did Aristotle define as ‘the knowledge of immaterial being’?",
+              "answer": "Metaphysics",
+              "choices": [
+                "Psychology",
+                "Logic",
+                "Metaphysics",
+                "Philosophy"
+              ]
+            },
+            {
+              "clue": "Which WWF group does this theme music belong to?",
+              "answer": "D-Generation X",
+              "choices": [
+                "Nation of Domination",
+                "D-Generation X",
+                "Legion of Doom",
+                "Hart Foundation"
+              ]
+            },
+            {
+              "clue": "What position is former Major League Baseball player, Rollie Fingers famous for playing?",
+              "answer": "Pitcher",
+              "choices": [
+                "Catcher",
+                "First Base",
+                "Pitcher",
+                "Third Base"
+              ]
+            },
+            {
+              "clue": "What position is former baseball player for the Cincinnati Reds, Johnny Bench famous for playing?",
+              "answer": "Catcher",
+              "choices": [
+                "Second Base",
+                "Shortstop",
+                "Catcher",
+                "Pitcher"
+              ]
+            },
+            {
+              "clue": "Baltimore Orioles, Cal Ripken Jr. is most known for playing what position?",
+              "answer": "Shortstop",
+              "choices": [
+                "Right Field",
+                "Catcher",
+                "Pitcher",
+                "Shortstop"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "OpenTriviaQA Showcase Pack 2",
+      "description": "Entertainment-focused pack seeded from OpenTriviaQA.",
+      "categories": [
+        {
+          "slug": "movies",
+          "name": "MOVIES",
+          "questions": [
+            {
+              "clue": "I would rather be a ghost drifting by your side as a condemned soul than enter heaven without you. Because of your love, I will never be a lonely spirit. (2000)",
+              "answer": "Crouching Tiger, Hidden Dragon",
+              "choices": [
+                "Don Juan DeMarco",
+                "Ever After",
+                "Crouching Tiger, Hidden Dragon",
+                "Dracula"
+              ]
+            },
+            {
+              "clue": "There are only four questions of value in life. What is sacred? Of what is the spirit made of? What is worth living for? What is worth dying for? The answer to each is the same. Only love. (1995)",
+              "answer": "Don Juan DeMarco",
+              "choices": [
+                "When Harry Met Sally",
+                "Don Juan DeMarco",
+                "Cant Hardly Wait",
+                "Ten Things I Hate About You"
+              ]
+            },
+            {
+              "clue": "I have crossed oceans of time to find you. (1992)",
+              "answer": "Dracula",
+              "choices": [
+                "Moulin Rouge",
+                "Notting Hill",
+                "A Knights Tale",
+                "Dracula"
+              ]
+            },
+            {
+              "clue": "I came here tonight because when you realize you want to spend the rest of your life with somebody, you want the rest of your life to start as soon as possible. (1989)",
+              "answer": "When Harry Met Sally",
+              "choices": [
+                "When Harry Met Sally",
+                "Wuthering Heights",
+                "Youve Got Mail",
+                "The Mask of Zorro"
+              ]
+            },
+            {
+              "clue": "Love has given me wings so I must fly. (2001)",
+              "answer": "A Knights Tale",
+              "choices": [
+                "A Knights Tale",
+                "Phenomenon",
+                "Ever After",
+                "Forget Paris"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "television",
+          "name": "TELEVISION",
+          "questions": [
+            {
+              "clue": "Urban Meyer left the head coach position at the Utah Utes to become head coach of this team.",
+              "answer": "University of Florida",
+              "choices": [
+                "Florida St.",
+                "Bowling Green",
+                "University of Florida",
+                "University of Miami"
+              ]
+            },
+            {
+              "clue": "Jack Bauer, Nina Myers and George Mason are three of the characters of this TV series.",
+              "answer": "24",
+              "choices": [
+                "24",
+                "3 South",
+                "60 Minutes",
+                "20/20"
+              ]
+            },
+            {
+              "clue": "Harry Solomon, Dick Solomon and Dr. Mary Albright.",
+              "answer": "3rd Rock from the Sun",
+              "choices": [
+                "Battlestar Galactica",
+                "3rd Rock from the Sun",
+                "The A-Team",
+                "7th Heaven"
+              ]
+            },
+            {
+              "clue": "The annoying neighbours, the Ochmoneks are from this TV show.",
+              "answer": "ALF",
+              "choices": [
+                "Dawsons Creek",
+                "ALF",
+                "Beverly Hills 90210",
+                "All My Children"
+              ]
+            },
+            {
+              "clue": "One of these characters is not from Baywatch.",
+              "answer": "Kelly Taylor",
+              "choices": [
+                "Hobie Buchannon",
+                "Jill Riley",
+                "Kelly Taylor",
+                "Craig Pomeroy"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "people",
+          "name": "PEOPLE",
+          "questions": [
+            {
+              "clue": "What music video portrays Kylie Minogue lying amongst many men and women by a poolside?",
+              "answer": "Slow",
+              "choices": [
+                "On a Night Like This",
+                "Red Blooded Woman",
+                "Chocolate",
+                "Slow"
+              ]
+            },
+            {
+              "clue": "Which statesman uttered these words: “Thus, by every device from the stick to the carrot, the emaciated Austrian donkey is made to pull the Nazi barrow up an ever-steepening hill”?",
+              "answer": "Winston Churchill",
+              "choices": [
+                "Winston Churchill",
+                "Joseph Stalin",
+                "Franklin D. Roosevelt",
+                "Charles DeGaulle"
+              ]
+            },
+            {
+              "clue": "There is no glory in outstripping donkeys” was a statement by this Greek Emperor.",
+              "answer": "Marcus Aurelius",
+              "choices": [
+                "Romulus Augustus",
+                "Marcus Aurelius",
+                "Tiberius",
+                "Hadrian"
+              ]
+            },
+            {
+              "clue": "Which modern day comedian annoyed his wife with this saying: “I kept giving her donkey ears.”?",
+              "answer": "Chevy Chase",
+              "choices": [
+                "Chevy Chase",
+                "Adam Sandler",
+                "Dan Aykroyd",
+                "Ben Stiller"
+              ]
+            },
+            {
+              "clue": "This Welsh-born English poet said: If a donkey bray at you, dont bray at him”.",
+              "answer": "George Herbert",
+              "choices": [
+                "George Herbert",
+                "Waldo Williams",
+                "Bertrand Russell",
+                "Dylan Thomas"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "entertainment",
+          "name": "ENTERTAINMENT",
+          "questions": [
+            {
+              "clue": "Greta Garbo was successfully treated for this disease.",
+              "answer": "Breast cancer",
+              "choices": [
+                "Tuberculosis",
+                "Breast cancer",
+                "Hepatitis",
+                "Cirrhosis"
+              ]
+            },
+            {
+              "clue": "In 1952, A.S. Douglas developed the first graphical game to run on a computer.  It ran on the EDSAC.  What was the name of this game?",
+              "answer": "OXO",
+              "choices": [
+                "Go",
+                "Check It",
+                "OXO",
+                "Tennis For Two"
+              ]
+            },
+            {
+              "clue": "Nolan Bushnell is considered to be the father of the video arcade industry. In 1972 he founded his own game company and together with Ted Dabney and Al Alcorn released the first arcade video game with major success- Pong. What was the name of his company?",
+              "answer": "Atari",
+              "choices": [
+                "Nutting Associates",
+                "Nintendo",
+                "Sega",
+                "Atari"
+              ]
+            },
+            {
+              "clue": "Pong was first installed at a high school.",
+              "answer": "False",
+              "choices": [
+                "False",
+                "True"
+              ]
+            },
+            {
+              "clue": "In 1972 a company named Waco released the first handheld electronic game. What was its name?",
+              "answer": "Tic Tac Toe",
+              "choices": [
+                "Cross",
+                "Tic Tac Toe",
+                "Tetris",
+                "Microvision"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "hobbies",
+          "name": "HOBBIES",
+          "questions": [
+            {
+              "clue": "If youve ordered a burn one, take it through the garden, pin a rose on it, what can you expect to be placed in front of you?",
+              "answer": "Hamburger with Lettuce, Tomato and Onion",
+              "choices": [
+                "Hot Dog with Chili and Coleslaw",
+                "Lamb Shish - Kabob",
+                "Hamburger with Lettuce, Tomato and Onion",
+                "Tuna Melt on Rye with Lettuce and Dill Chips"
+              ]
+            },
+            {
+              "clue": "If the girl next to you orders baled hay, life preserver and java for breakfast, what has she ordered?",
+              "answer": "Shredded wheat, donut and coffee",
+              "choices": [
+                "Cream of wheat , donut and coffee",
+                "Hash browns, omelet, and coffee",
+                "Buckwheat pancakes, danish, and coffee",
+                "Shredded wheat, donut and coffee"
+              ]
+            },
+            {
+              "clue": "Noahs Boy refers to a fish sandwich.",
+              "answer": "False",
+              "choices": [
+                "False",
+                "True"
+              ]
+            },
+            {
+              "clue": "Its your first day on the job at your favorite diner!  The waitress next to you yells out to the short order cook that she needs two cows, make them cry, and paint em red.  What has she requested the short order cook to prepare?",
+              "answer": "Two hamburgers with onions, cover in ketchup",
+              "choices": [
+                "Two hamburgers with onions, cover in ketchup",
+                "Two orders of beef liver and onions with ketchup",
+                "Salisbury steak with American sauce.",
+                "Double cheeseburger, no onions, special sauce"
+              ]
+            },
+            {
+              "clue": "Your friends favorite breakfast is a shingle with shimmy and shake, squeeze one.   What does he like to eat for breakfast?",
+              "answer": "Buttered toast with jam and orange juice",
+              "choices": [
+                "French toast and apple juice",
+                "Link sausage,  toast and juice",
+                "Buttered toast with jam and orange juice",
+                "Short stack of pancakes and instant coffee"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "world",
+          "name": "WORLD",
+          "questions": [
+            {
+              "clue": "LFD2 was banned in Australia.",
+              "answer": "True",
+              "choices": [
+                "False",
+                "True"
+              ]
+            },
+            {
+              "clue": "One of the remnants of this states former status as a possession of France is the fact that it was named after a French king.",
+              "answer": "Louisiana",
+              "choices": [
+                "Oklahoma",
+                "Florida",
+                "Louisiana",
+                "Georgia"
+              ]
+            },
+            {
+              "clue": "No state has as many different species of mammals as this one. The average square mile of land contains 1.4 elk, 1.4 pronghorn antelope, and 3.3 deer.",
+              "answer": "Montana",
+              "choices": [
+                "Nebraska",
+                "Nevada",
+                "Colorado",
+                "Montana"
+              ]
+            },
+            {
+              "clue": "Arizona became the 48th state on February 14, 1912.",
+              "answer": "True",
+              "choices": [
+                "False",
+                "True"
+              ]
+            },
+            {
+              "clue": "The largest lake in this state is Lake Okeechobee. The state is also home to one of the two naturally round lakes in the world.",
+              "answer": "Florida",
+              "choices": [
+                "Hawaii",
+                "Tennessee",
+                "Florida",
+                "Alabama"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "OpenTriviaQA Showcase Pack 3",
+      "description": "Family-friendly mix seeded from OpenTriviaQA.",
+      "categories": [
+        {
+          "slug": "animals",
+          "name": "ANIMALS",
+          "questions": [
+            {
+              "clue": "Three of these animals hibernate. Which one does not?",
+              "answer": "Sloth",
+              "choices": [
+                "Mouse",
+                "Sloth",
+                "Frog",
+                "Snake"
+              ]
+            },
+            {
+              "clue": "All of these animals are omnivorous except one.",
+              "answer": "Snail",
+              "choices": [
+                "Fox",
+                "Mouse",
+                "Opossum",
+                "Snail"
+              ]
+            },
+            {
+              "clue": "Three of these Latin names are names of bears. Which is the odd one?",
+              "answer": "Felis silvestris catus",
+              "choices": [
+                "Melursus ursinus",
+                "Helarctos malayanus",
+                "Ursus minimus",
+                "Felis silvestris catus"
+              ]
+            },
+            {
+              "clue": "These are typical Australian animals except one.",
+              "answer": "Sloth",
+              "choices": [
+                "Platypus",
+                "Dingo",
+                "Echidna",
+                "Sloth"
+              ]
+            },
+            {
+              "clue": "Representatives of three of these species produce venom of their own. Which is the odd species?",
+              "answer": "Mosquitos",
+              "choices": [
+                "Lizards",
+                "Scorpions",
+                "Frogs",
+                "Mosquitos"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "brain-teasers",
+          "name": "BRAIN TEASERS",
+          "questions": [
+            {
+              "clue": "Which of these is true about the sleep of zebras?",
+              "answer": "They sleep standing up.",
+              "choices": [
+                "All of these",
+                "They sleep standing up.",
+                "They would fall asleep every 5 to 6 hours.",
+                "They need more than 12 hours of sleep a day."
+              ]
+            },
+            {
+              "clue": "A farmer had 12 sheep and 3 cows. All of the animals except 9 sheep died. How many animals did he have left in his farm?",
+              "answer": "9 sheep",
+              "choices": [
+                "5 cows and 1 sheep",
+                "9 sheep",
+                "2 cows",
+                "none"
+              ]
+            },
+            {
+              "clue": "I dont speak, I cannot hear, but I always tell the truth.",
+              "answer": "The Mirror",
+              "choices": [
+                "The watch",
+                "Fish",
+                "The Mirror",
+                "Old granny"
+              ]
+            },
+            {
+              "clue": "Can a Roman Catholic man from California marry his widows sister who is from Texas?",
+              "answer": "No",
+              "choices": [
+                "Yes",
+                "No"
+              ]
+            },
+            {
+              "clue": "How does this proverb continue: The squeaking wheel gets ...",
+              "answer": "The grease",
+              "choices": [
+                "The rust",
+                "Removed",
+                "The broken",
+                "The grease"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "for-kids",
+          "name": "FOR KIDS",
+          "questions": [
+            {
+              "clue": "What is NOT one of Strong Bads favorite bands in the Internet cartoon Homestar Runner?",
+              "answer": "sloshy",
+              "choices": [
+                "sloshy",
+                "Peter Frampton",
+                "Limozeen",
+                "Taranchula"
+              ]
+            },
+            {
+              "clue": "Speaking of the famous fairy tale, that girl with the long hair was named which of these plants?",
+              "answer": "Rampion",
+              "choices": [
+                "Rampion",
+                "Turnip",
+                "Lettuce",
+                "Safflower"
+              ]
+            },
+            {
+              "clue": "Sleeping Beauty pricked her finger on the part of a spinning wheel that does this.",
+              "answer": "Twists the fibres into a thread",
+              "choices": [
+                "Collects the finished thread",
+                "Powers the wheel",
+                "Twists the fibres into a thread",
+                "Sorts the finished threads"
+              ]
+            },
+            {
+              "clue": "Why does Cinderella wear a glass slipper?",
+              "answer": "Glass shoes sound like something a princess would wear.",
+              "choices": [
+                "Glass shoes sound like something a princess would wear.",
+                "Vair (fur), was mistaken for verre (glass).",
+                "They were a symbol of her purity.",
+                "Glass shoes were worn by royalty."
+              ]
+            },
+            {
+              "clue": "The Little Mermaid refused to kill the prince, so she eventually ends up as this.",
+              "answer": "A daughter of the air.",
+              "choices": [
+                "A block-buster animated film.",
+                "Foam on the waves.",
+                "A mermaid again.",
+                "A daughter of the air."
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "general",
+          "name": "GENERAL",
+          "questions": [
+            {
+              "clue": "This drink contains caffeine.",
+              "answer": "Coffee",
+              "choices": [
+                "Mineral water",
+                "Orange juice",
+                "Coffee",
+                "Beer"
+              ]
+            },
+            {
+              "clue": "Finish the proverb:",
+              "answer": "...not made.",
+              "choices": [
+                "...not made.",
+                "...but can also be made.",
+                "...but thats not for sure.",
+                "..., long live the poets!"
+              ]
+            },
+            {
+              "clue": "If a TV program is rated G then this is true.",
+              "answer": "It is suitable for all audiences.",
+              "choices": [
+                "It contains moderate violence.",
+                "It contains mild sexual situations.",
+                "It is suitable for all audiences.",
+                "It is suitable for young children."
+              ]
+            },
+            {
+              "clue": "The theory of relativity was introduced in physics by this man.",
+              "answer": "Albert Einstein",
+              "choices": [
+                "Galileo Galilei",
+                "Albert Einstein",
+                "Archimedes",
+                "Isaac Newton"
+              ]
+            },
+            {
+              "clue": "The symbol for the chemical element iron is this.",
+              "answer": "Fe",
+              "choices": [
+                "I",
+                "Fe",
+                "Zn",
+                "Br"
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "humanities",
+          "name": "HUMANITIES",
+          "questions": [
+            {
+              "clue": "Which vegetables are considered taboo food in Buddhist tradition?",
+              "answer": "Garlic and onion",
+              "choices": [
+                "All legumes",
+                "Garlic and onion",
+                "Eggplants and tomatoes",
+                "Cabbage and lettuce"
+              ]
+            },
+            {
+              "clue": "Is this the correct usage of the word inferring?",
+              "answer": "No",
+              "choices": [
+                "No",
+                "Yes"
+              ]
+            },
+            {
+              "clue": "Is this the correct usage of the word continually?",
+              "answer": "No",
+              "choices": [
+                "No",
+                "Yes"
+              ]
+            },
+            {
+              "clue": "Which of these sentences is correct?",
+              "answer": "Whence did he come?",
+              "choices": [
+                "From hence to eternity, I will search.",
+                "Whence did he come?",
+                "From whence did he come?",
+                "If you build it, thence he will come."
+              ]
+            },
+            {
+              "clue": "Which of these is correct?",
+              "answer": "The capitol building is located in the capital.",
+              "choices": [
+                "The capitol building is located in the capitol.",
+                "The capital building is located in the capital.",
+                "The capitol building is located in the capital.",
+                "The capital building is located in the capitol."
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "video-games",
+          "name": "VIDEO GAMES",
+          "questions": [
+            {
+              "clue": "In what fictional city is the TV show Futurama set?",
+              "answer": "New New York",
+              "choices": [
+                "New Chicago",
+                "New New York",
+                "New San Francisco",
+                "None of these"
+              ]
+            },
+            {
+              "clue": "What is the lowest ranking species in the Covenant hierarchy in the Halo series?",
+              "answer": "Grunt",
+              "choices": [
+                "Drone",
+                "Brute",
+                "Elite",
+                "Grunt"
+              ]
+            },
+            {
+              "clue": "Who controls the Flood in the Halo series?",
+              "answer": "Gravemind",
+              "choices": [
+                "Gravemind",
+                "The Prophet of Truth",
+                "The Arbiter",
+                "No one"
+              ]
+            },
+            {
+              "clue": "What is a SPARTAN in the Halo series?",
+              "answer": "All of these",
+              "choices": [
+                "A Genetically modified super soldier",
+                "A higher ranking soldier than a ODST",
+                "Troopers that went through military training at the age of five",
+                "All of these"
+              ]
+            },
+            {
+              "clue": "What species is the Didact in the Halo series?",
+              "answer": "Forerunner",
+              "choices": [
+                "Forerunner",
+                "Precursor",
+                "Promethean",
+                "Yamne"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

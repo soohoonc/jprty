@@ -1,12 +1,12 @@
 # SpacetimeDB Module
 
-This directory contains the live-room runtime module and source-of-truth gameplay state.
+This directory contains the SpacetimeDB runtime module for JPRTY live state.
 
 ## Current scope
 
-- Give local development a stable `spacetimedb/` project path.
-- Keep room lifecycle in SpacetimeDB reducers/tables.
-- Keep authoritative gameplay snapshot, scores, and board cells in SpacetimeDB reducers/tables.
+- SpacetimeDB is the source of truth for room presence and gameplay state.
+- Reducers cover room lifecycle, player presence, clue selection, buzzer ownership, answer submission, scores, and selector turn progression.
+- Legacy `sync_mirrored_*` reducers remain available for compatibility while clients move to direct live tables.
 
 ## Local workflow
 
@@ -24,18 +24,32 @@ spacetime start
 spacetime publish --server local --project-path spacetimedb jprty-room-runtime
 ```
 
-## Module reducers
+## Live gameplay reducers
 
-- `sync_live_room` upserts the mirrored room snapshot.
-- `sync_live_room_player` upserts mirrored player presence rows.
-- `remove_live_room_player` deletes mirrored player presence rows.
-- `sync_mirrored_game_state` upserts the current gameplay snapshot for a room.
-- `sync_mirrored_game_score` upserts one mirrored player score row.
-- `sync_mirrored_game_board_cell` upserts one mirrored board-cell row.
-- `init` keeps the module publishable before app reads switch over to SpacetimeDB.
+- `sync_live_room`
+- `sync_live_room_player`
+- `remove_live_room_player`
+- `start_live_game`
+- `sync_live_game_board_cell`
+- `sync_live_game_score`
+- `select_live_game_cell`
+- `buzz_live_game`
+- `submit_live_game_answer`
 
-## Planned follow-up
+## Live tables
 
-- Generate TypeScript bindings for `apps/web`.
-- Switch runtime reads from the Prisma/socket bridge to SpacetimeDB-backed subscriptions.
-- Move gameplay reducers into the module after the mirrored lobby slice is stable.
+- `live_room`
+- `live_room_player`
+- `live_game_state`
+- `live_game_board_cell`
+- `live_game_score`
+- `live_game_buzz`
+
+## Compatibility reducers/tables
+
+- `sync_mirrored_game_state`
+- `sync_mirrored_game_score`
+- `sync_mirrored_game_board_cell`
+- `mirrored_game_state`
+- `mirrored_game_score`
+- `mirrored_game_board_cell`

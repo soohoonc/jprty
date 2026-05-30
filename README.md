@@ -82,6 +82,7 @@ The live runtime direction is now SpacetimeDB-first for room/game state.
 - Copy `.env.example` to `.env` at the repo root.
 - Start a local PostgreSQL instance on `localhost:5432` with a `jprty` database and the `postgres` user.
 - Run `bun run --cwd packages/db db:migrate` and `bun run --cwd packages/db db:seed`.
+- Default seed data now uses OpenTriviaQA (CC BY-SA 4.0). See `docs/question-bank-open-trivia.md`.
 - Postgres is limited to auth/users and relational app metadata.
 - Vercel builds only run the Turbo build graph and Prisma client generation. Run `bun run --cwd packages/db db:deploy` once per release from a single deploy job or operator shell instead of from the parallel build graph.
 
@@ -90,6 +91,7 @@ The live runtime direction is now SpacetimeDB-first for room/game state.
 - `apps/web` targets Vercel.
 - `spacetimedb/` is the source of truth for live rooms and gameplay state.
 - Legacy Fly app-server deployment files were retired (`fly.toml`, `Dockerfile`).
+- Multiplayer reducer smoke walkthrough: `docs/spacetimedb-authoritative-multiplayer.md`.
 
 The DB package now loads the repo-root `.env` directly, so package-scoped commands such as `db:seed` do not require manual shell exports first.
 
