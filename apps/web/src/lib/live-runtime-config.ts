@@ -1,7 +1,19 @@
 import type { LiveRoomRuntimeBackend } from "@jprty/shared";
 
+function cleanEnv(value: string | undefined): string | undefined {
+	if (!value) return undefined;
+	const trimmed = value.trim();
+	if (
+		(trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+		(trimmed.startsWith("'") && trimmed.endsWith("'"))
+	) {
+		return trimmed.slice(1, -1);
+	}
+	return trimmed;
+}
+
 export function getPreferredLiveRuntimeBackend(): LiveRoomRuntimeBackend {
-	const configured = process.env.NEXT_PUBLIC_LIVE_RUNTIME_BACKEND;
+	const configured = cleanEnv(process.env.NEXT_PUBLIC_LIVE_RUNTIME_BACKEND);
 	if (configured === "spacetimedb") {
 		return "spacetimedb";
 	}
@@ -9,13 +21,14 @@ export function getPreferredLiveRuntimeBackend(): LiveRoomRuntimeBackend {
 }
 
 export function getSpacetimeReadConfig() {
+	const pollRaw = cleanEnv(process.env.NEXT_PUBLIC_SPACETIMEDB_POLL_MS);
 	return {
-		baseUrl: process.env.NEXT_PUBLIC_SPACETIMEDB_URL,
-		database: process.env.NEXT_PUBLIC_SPACETIMEDB_DATABASE,
+		baseUrl: cleanEnv(process.env.NEXT_PUBLIC_SPACETIMEDB_URL),
+		database: cleanEnv(process.env.NEXT_PUBLIC_SPACETIMEDB_DATABASE),
 		pollMs: Math.max(
 			500,
 			Number.parseInt(
-				process.env.NEXT_PUBLIC_SPACETIMEDB_POLL_MS ?? "2000",
+				pollRaw ?? "2000",
 				10,
 			) || 2000,
 		),

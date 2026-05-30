@@ -4,16 +4,9 @@ import {
 	canUseDirectSpacetimeReads,
 	getSpacetimeReadConfig,
 } from "@/lib/live-runtime-config";
-import { useSocket } from "@/lib/socket";
 import { getRoomByCodeFromSpacetime } from "@/lib/spacetimedb-read";
-import type {
-	JoinedRoomPayload,
-	LiveRoomRuntimeSnapshot,
-	Player,
-	PlayerJoinedPayload,
-	PlayerLeftPayload,
-} from "@jprty/shared";
-import { ROOM_EVENTS } from "@jprty/shared";
+import { api } from "@/trpc/react";
+import type { LiveRoomRuntimeSnapshot, Player } from "@jprty/shared";
 import { useEffect, useState } from "react";
 
 interface UseRoomRuntimeOptions {
@@ -23,37 +16,37 @@ interface UseRoomRuntimeOptions {
 	onPlayerLeft?: (player: Partial<Player>) => void;
 }
 
-function readRuntimeRoom(
-	payload:
-		| JoinedRoomPayload
-		| PlayerJoinedPayload
-		| PlayerLeftPayload
-		| { room?: LiveRoomRuntimeSnapshot | null },
-) {
-	return payload.room ?? null;
-}
-
 export function useRoomRuntime(options: UseRoomRuntimeOptions = {}) {
-	const { roomCode, enabled = true, onPlayerJoined, onPlayerLeft } = options;
-	const { socket } = useSocket();
+	const { roomCode, enabled = true, onPlayerJoined } = options;
 	const [room, setRoom] = useState<LiveRoomRuntimeSnapshot | null>(null);
 	const [player, setPlayer] = useState<Player | null>(null);
-	const [spacetimeFailed, setSpacetimeFailed] = useState(false);
+	const [clientSpacetimeFailed, setClientSpacetimeFailed] = useState(false);
+	const config = getSpacetimeReadConfig();
 	const directSpacetimeEnabled =
 		enabled && !!roomCode && canUseDirectSpacetimeReads();
-	const useSocketFallback = !directSpacetimeEnabled || spacetimeFailed;
+	const serverSpacetimeFallbackEnabled =
+		enabled && !!roomCode && (!directSpacetimeEnabled || clientSpacetimeFailed);
+
+	const serverRuntime = api.game.getLiveRoomRuntime.useQuery(
+		{ roomCode: (roomCode ?? "").toUpperCase() },
+		{
+			enabled: serverSpacetimeFallbackEnabled,
+			refetchInterval: config.pollMs,
+			refetchIntervalInBackground: true,
+			retry: false,
+		},
+	);
 
 	useEffect(() => {
 		if (!directSpacetimeEnabled || !roomCode) {
 			return;
 		}
 
-		setSpacetimeFailed(false);
+		setClientSpacetimeFailed(false);
 
-		const config = getSpacetimeReadConfig();
-		const { baseUrl, database, pollMs } = config;
+		const { baseUrl, database, pollMs } = getSpacetimeReadConfig();
 		if (!baseUrl || !database) {
-			setSpacetimeFailed(true);
+			setClientSpacetimeFailed(true);
 			return;
 		}
 
@@ -73,10 +66,10 @@ export function useRoomRuntime(options: UseRoomRuntimeOptions = {}) {
 			} catch (error) {
 				if (!cancelled) {
 					console.warn(
-						"[spacetimedb] room read failed, falling back to socket runtime",
+						"[spacetimedb] client room read failed, switching to server runtime poll",
 						error,
 					);
-					setSpacetimeFailed(true);
+					setClientSpacetimeFailed(true);
 				}
 			}
 		};
@@ -93,47 +86,35 @@ export function useRoomRuntime(options: UseRoomRuntimeOptions = {}) {
 	}, [directSpacetimeEnabled, roomCode]);
 
 	useEffect(() => {
-		if (!socket || !enabled || !useSocketFallback) {
+		if (!serverSpacetimeFallbackEnabled) {
 			return;
 		}
 
-		const handleJoined = (payload: JoinedRoomPayload) => {
-			setRoom(readRuntimeRoom(payload));
-			setPlayer(payload.player);
-		};
+		const nextRoom = serverRuntime.data ?? null;
+		if (!nextRoom) {
+			return;
+		}
 
-		const handlePlayerJoined = (payload: PlayerJoinedPayload) => {
-			setRoom(readRuntimeRoom(payload));
-			onPlayerJoined?.(payload.player);
-		};
+		const previousPlayerIds = new Set((room?.players ?? []).map((p) => p.id));
+		for (const runtimePlayer of nextRoom.players) {
+			if (!previousPlayerIds.has(runtimePlayer.id)) {
+				onPlayerJoined?.(runtimePlayer);
+			}
+		}
 
-		const handlePlayerLeft = (payload: PlayerLeftPayload) => {
-			setRoom(readRuntimeRoom(payload));
-			onPlayerLeft?.(payload.player);
-		};
+		setRoom(nextRoom);
+	}, [serverSpacetimeFallbackEnabled, serverRuntime.data, room, onPlayerJoined]);
 
-		const handleState = (payload: {
-			room?: LiveRoomRuntimeSnapshot | null;
-		}) => {
-			setRoom(readRuntimeRoom(payload));
-		};
-
-		socket.on(ROOM_EVENTS.JOINED, handleJoined);
-		socket.on(ROOM_EVENTS.PLAYER_JOINED, handlePlayerJoined);
-		socket.on(ROOM_EVENTS.PLAYER_LEFT, handlePlayerLeft);
-		socket.on(ROOM_EVENTS.STATE, handleState);
-
-		return () => {
-			socket.off(ROOM_EVENTS.JOINED, handleJoined);
-			socket.off(ROOM_EVENTS.PLAYER_JOINED, handlePlayerJoined);
-			socket.off(ROOM_EVENTS.PLAYER_LEFT, handlePlayerLeft);
-			socket.off(ROOM_EVENTS.STATE, handleState);
-		};
-	}, [socket, enabled, onPlayerJoined, onPlayerLeft, useSocketFallback]);
+	useEffect(() => {
+		if (!roomCode || !enabled) {
+			setRoom(null);
+			setPlayer(null);
+		}
+	}, [roomCode, enabled]);
 
 	return {
 		room,
 		player,
-		usingSocketFallback: useSocketFallback,
+		usingSocketFallback: false,
 	};
 }

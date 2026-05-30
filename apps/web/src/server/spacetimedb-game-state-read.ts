@@ -3,7 +3,7 @@ import "server-only";
 interface SqlStmtResult {
 	schema?: {
 		elements?: Array<{
-			name?: string;
+			name?: string | { some?: string };
 		}>;
 	};
 	rows: unknown[];
@@ -42,6 +42,18 @@ export interface RuntimeGameStateSnapshot {
 
 function normalizeBaseUrl(baseUrl: string) {
 	return baseUrl.replace(/\/+$/, "");
+}
+
+function cleanEnv(value: string | undefined): string | undefined {
+	if (!value) return undefined;
+	const trimmed = value.trim();
+	if (
+		(trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+		(trimmed.startsWith("'") && trimmed.endsWith("'"))
+	) {
+		return trimmed.slice(1, -1);
+	}
+	return trimmed;
 }
 
 function escapeSqlString(value: string) {
@@ -87,7 +99,14 @@ function getRowElements(row: unknown): unknown[] | null {
 function getFieldNames(stmt: SqlStmtResult): string[] {
 	return (
 		stmt.schema?.elements
-			?.map((element) => element.name || "")
+			?.map((element) => {
+				const name = element.name;
+				if (typeof name === "string") return name;
+				if (name && typeof name === "object" && typeof name.some === "string") {
+					return name.some;
+				}
+				return "";
+			})
 			.filter(Boolean) || []
 	);
 }
@@ -152,23 +171,22 @@ async function querySql(
 
 function getSpacetimeReadConfig() {
 	return {
-		enabled: process.env.SPACETIMEDB_READS_ENABLED === "true",
-		baseUrl: process.env.SPACETIMEDB_URL,
-		database: process.env.SPACETIMEDB_DATABASE,
-		token: process.env.SPACETIMEDB_TOKEN,
+		baseUrl: cleanEnv(process.env.SPACETIMEDB_URL),
+		database: cleanEnv(process.env.SPACETIMEDB_DATABASE),
+		token: cleanEnv(process.env.SPACETIMEDB_TOKEN),
 	};
 }
 
 export function canReadGameStateFromSpacetime() {
 	const config = getSpacetimeReadConfig();
-	return Boolean(config.enabled && config.baseUrl && config.database);
+	return Boolean(config.baseUrl && config.database);
 }
 
 export async function getGameStateFromSpacetimeByRoomCode(
 	roomCode: string,
 ): Promise<RuntimeGameStateSnapshot | null> {
 	const config = getSpacetimeReadConfig();
-	if (!config.enabled || !config.baseUrl || !config.database) {
+	if (!config.baseUrl || !config.database) {
 		return null;
 	}
 
@@ -185,7 +203,7 @@ export async function getGameStateFromSpacetimeByRoomCode(
 
 	const gameStateRows = await querySql(
 		sqlUrl,
-		`select room_id, phase, round_type, round_number, total_rounds, selector_player_id, current_player_id, current_question_id, current_question_clue, current_question_category, current_question_value, time_remaining, current_wager from mirrored_game_state where room_id = '${escapeSqlString(roomId)}' limit 1`,
+		`select room_id, phase, round_number, total_rounds, selector_player_id, current_player_id, current_question_id, current_question_category, current_question_value, active_cell_id from live_game_state where room_id = '${escapeSqlString(roomId)}' limit 1`,
 		config.token,
 	);
 	const stateRow = gameStateRows[0];
@@ -193,20 +211,40 @@ export async function getGameStateFromSpacetimeByRoomCode(
 
 	const scoreRows = await querySql(
 		sqlUrl,
-		`select player_id, score from mirrored_game_score where room_id = '${escapeSqlString(roomId)}' order by score desc`,
+		`select player_id, score from live_game_score where room_id = '${escapeSqlString(roomId)}'`,
 		config.token,
 	);
 	const boardRows = await querySql(
 		sqlUrl,
-		`select question_id, value, is_used, is_daily_double, row, col, category from mirrored_game_board_cell where room_id = '${escapeSqlString(roomId)}' order by row asc, col asc`,
+		`select cell_id, question_id, clue, answer, value, is_used, is_daily_double, row, col, category from live_game_board_cell where room_id = '${escapeSqlString(roomId)}'`,
 		config.token,
+	);
+	const buzzRows = await querySql(
+		sqlUrl,
+		`select * from live_game_buzz where room_id = '${escapeSqlString(roomId)}'`,
+		config.token,
+	);
+	const sortedScoreRows = [...scoreRows].sort(
+		(a, b) => coerceNumber(b.score) - coerceNumber(a.score),
+	);
+	const sortedBoardRows = [...boardRows].sort((a, b) => {
+		const rowDelta = coerceNumber(a.row) - coerceNumber(b.row);
+		if (rowDelta !== 0) return rowDelta;
+		return coerceNumber(a.col) - coerceNumber(b.col);
+	});
+	const sortedBuzzRows = [...buzzRows].sort(
+		(a, b) => coerceNumber(a.position) - coerceNumber(b.position),
 	);
 
 	const currentQuestionId = coerceString(stateRow.current_question_id);
-	const currentQuestionClue = coerceString(stateRow.current_question_clue);
+	const activeCellId = coerceString(stateRow.active_cell_id);
+	const activeCell = sortedBoardRows.find(
+		(row) => coerceString(row.cell_id) === activeCellId,
+	);
+	const currentQuestionClue = coerceString(activeCell?.clue);
 
 	const categoriesByColumn = new Map<number, string>();
-	for (const row of boardRows) {
+	for (const row of sortedBoardRows) {
 		const col = coerceNumber(row.col);
 		if (!categoriesByColumn.has(col)) {
 			categoriesByColumn.set(col, coerceString(row.category));
@@ -219,7 +257,7 @@ export async function getGameStateFromSpacetimeByRoomCode(
 		(index) => categoriesByColumn.get(index) || "",
 	);
 
-	const grid = boardRows.map((row) => ({
+	const grid = sortedBoardRows.map((row) => ({
 		questionId: coerceString(row.question_id),
 		value: coerceNumber(row.value),
 		isUsed: coerceBoolean(row.is_used),
@@ -229,15 +267,14 @@ export async function getGameStateFromSpacetimeByRoomCode(
 	}));
 
 	const timeRemaining = coerceNumber(stateRow.time_remaining, -1);
-	const currentWager = coerceNumber(stateRow.current_wager, -1);
 
 	return {
 		roomId: coerceString(stateRow.room_id),
 		phase: coerceString(stateRow.phase),
-		roundType: coerceString(stateRow.round_type),
+		roundType: "SINGLE_JEOPARDY",
 		roundNumber: coerceNumber(stateRow.round_number, 1),
 		totalRounds: coerceNumber(stateRow.total_rounds, 1),
-		scores: scoreRows.map((row) => [
+		scores: sortedScoreRows.map((row) => [
 			coerceString(row.player_id),
 			coerceNumber(row.score),
 		]),
@@ -249,15 +286,15 @@ export async function getGameStateFromSpacetimeByRoomCode(
 			? {
 					id: currentQuestionId,
 					clue: currentQuestionClue,
-					category:
-						coerceString(stateRow.current_question_category) || undefined,
+					category: coerceString(stateRow.current_question_category) || undefined,
 					value: coerceNumber(stateRow.current_question_value, 0),
 				}
 			: undefined,
 		currentPlayerId: coerceString(stateRow.current_player_id) || undefined,
 		selectorPlayerId: coerceString(stateRow.selector_player_id) || undefined,
-		buzzQueue: [],
+		buzzQueue: sortedBuzzRows
+			.map((row) => coerceString(row.player_id))
+			.filter(Boolean),
 		timeRemaining: timeRemaining >= 0 ? timeRemaining : undefined,
-		currentWager: currentWager >= 0 ? currentWager : undefined,
 	};
 }

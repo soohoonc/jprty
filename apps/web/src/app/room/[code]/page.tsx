@@ -13,10 +13,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useSocket } from "@/lib/socket";
 import { useRoomRuntime } from "@/lib/use-room-runtime";
 import { api } from "@/trpc/react";
-import { ROOM_EVENTS } from "@jprty/shared";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -59,8 +57,6 @@ export default function RoomPage() {
 	const params = useParams();
 	const router = useRouter();
 	const roomCode = params.code as string;
-	const { socket, isConnected } = useSocket();
-	const joinedSocketId = useRef<string | undefined>(undefined);
 	const hasAttemptedJoinRef = useRef(false);
 	const isLeavingRef = useRef(false);
 	const { room: runtimeRoom, player } = useRoomRuntime({
@@ -78,7 +74,11 @@ export default function RoomPage() {
 	// Check if game already started via tRPC
 	const { data: gameState } = api.game.getGameState.useQuery(
 		{ roomCode },
-		{ enabled: !!roomCode },
+		{
+			enabled: !!roomCode,
+			refetchInterval: 2000,
+			refetchIntervalInBackground: true,
+		},
 	);
 
 	// Redirect if game is already in progress
@@ -134,35 +134,6 @@ export default function RoomPage() {
 			});
 	}, [joinRoom, room, roomCode]);
 
-	// Join room when socket connects
-	useEffect(() => {
-		if (!socket || !isConnected) return;
-
-		// Only emit JOIN once per socket connection
-		if (joinedSocketId.current !== socket.id) {
-			joinedSocketId.current = socket.id;
-			const name = localStorage.getItem("playerName") || "Guest";
-			socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName: name });
-		}
-
-		// Always register listeners (they get cleaned up and need re-registering)
-		const handleGameStarted = () => {
-			router.push(`/room/${roomCode}/play`);
-		};
-
-		const handleError = (data: { message: string }) => {
-			toast.error(data.message);
-		};
-
-		socket.on(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
-		socket.on(ROOM_EVENTS.ERROR, handleError);
-
-		return () => {
-			socket.off(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
-			socket.off(ROOM_EVENTS.ERROR, handleError);
-		};
-	}, [socket, isConnected, roomCode, router]);
-
 	const handleLeaveRoom = async () => {
 		if (isLeavingRef.current) {
 			return;
@@ -172,10 +143,6 @@ export default function RoomPage() {
 		const normalizedRoomCode = roomCode.toUpperCase();
 		const membership = readStoredRoomMembership();
 		const playerId = localStorage.getItem("playerId");
-
-		if (socket) {
-			socket.emit(ROOM_EVENTS.LEAVE);
-		}
 
 		if (playerId && membership?.roomCode === normalizedRoomCode) {
 			try {
@@ -188,7 +155,7 @@ export default function RoomPage() {
 			}
 		}
 
-		if (membership?.roomCode === normalizedRoomCode) {
+		if (membership?.roomCode === normalizedRoomCode || playerId) {
 			localStorage.removeItem(ROOM_MEMBERSHIP_STORAGE_KEY);
 			localStorage.removeItem("playerId");
 		}

@@ -28,11 +28,23 @@ function normalizeBaseUrl(baseUrl: string) {
 	return baseUrl.replace(/\/+$/, "");
 }
 
+function cleanEnv(value: string | undefined): string | undefined {
+	if (!value) return undefined;
+	const trimmed = value.trim();
+	if (
+		(trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+		(trimmed.startsWith("'") && trimmed.endsWith("'"))
+	) {
+		return trimmed.slice(1, -1);
+	}
+	return trimmed;
+}
+
 function getConfig(): SpacetimeProvisionConfig {
 	return {
-		baseUrl: process.env.SPACETIMEDB_URL,
-		database: process.env.SPACETIMEDB_DATABASE,
-		token: process.env.SPACETIMEDB_TOKEN,
+		baseUrl: cleanEnv(process.env.SPACETIMEDB_URL),
+		database: cleanEnv(process.env.SPACETIMEDB_DATABASE),
+		token: cleanEnv(process.env.SPACETIMEDB_TOKEN),
 	};
 }
 

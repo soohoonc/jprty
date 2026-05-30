@@ -2,6 +2,13 @@ import {
 	canReadGameStateFromSpacetime,
 	getGameStateFromSpacetimeByRoomCode,
 } from "@/server/spacetimedb-game-state-read";
+import { getRoomByCodeFromSpacetime } from "@/lib/spacetimedb-read";
+import {
+	answerSpacetimeGame,
+	buzzSpacetimeGame,
+	selectSpacetimeQuestion,
+	startSpacetimeGameForRoom,
+} from "@/server/spacetimedb-gameplay";
 import {
 	canProvisionRoomInSpacetime,
 	provisionRoomInSpacetime,
@@ -44,6 +51,25 @@ type GameStateSnapshot = {
 };
 
 const GAME_SERVER_URL = process.env.GAME_SERVER_URL || "http://localhost:8080";
+
+function cleanEnv(value: string | undefined): string | undefined {
+	if (!value) return undefined;
+	const trimmed = value.trim();
+	if (
+		(trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+		(trimmed.startsWith("'") && trimmed.endsWith("'"))
+	) {
+		return trimmed.slice(1, -1);
+	}
+	return trimmed;
+}
+
+function getServerSpacetimeReadConfig() {
+	return {
+		baseUrl: cleanEnv(process.env.SPACETIMEDB_URL),
+		database: cleanEnv(process.env.SPACETIMEDB_DATABASE),
+	};
+}
 
 async function provisionRuntimeRoom(room: {
 	id: string;
@@ -394,6 +420,37 @@ export const gameRouter = createTRPCRouter({
 			return room;
 		}),
 
+	getLiveRoomRuntime: publicProcedure
+		.input(
+			z.object({
+				roomCode: z.string().length(4),
+			}),
+		)
+		.query(async ({ input }) => {
+			const config = getServerSpacetimeReadConfig();
+			if (!config.baseUrl || !config.database) {
+				throw new TRPCError({
+					code: "PRECONDITION_FAILED",
+					message:
+						"SpacetimeDB runtime reads are not configured on the server.",
+				});
+			}
+
+			try {
+				return await getRoomByCodeFromSpacetime({
+					baseUrl: config.baseUrl,
+					database: config.database,
+					roomCode: input.roomCode.toUpperCase(),
+				});
+			} catch (error) {
+				console.warn("[getLiveRoomRuntime] SpacetimeDB read failed", error);
+				throw new TRPCError({
+					code: "INTERNAL_SERVER_ERROR",
+					message: "Failed to fetch SpacetimeDB live room runtime",
+				});
+			}
+		}),
+
 	// Update room configuration (host only - no auth check since host is not logged in)
 	updateRoomConfig: publicProcedure
 		.input(
@@ -673,6 +730,88 @@ export const gameRouter = createTRPCRouter({
 		}),
 
 	// Legacy game-server reads are retired. Live room/game state now belongs to SpacetimeDB.
+	startGame: publicProcedure
+		.input(
+			z.object({
+				roomCode: z.string().length(4),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await startSpacetimeGameForRoom(input.roomCode);
+			} catch (error) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message:
+						error instanceof Error ? error.message : "Failed to start game",
+				});
+			}
+		}),
+
+	selectQuestion: publicProcedure
+		.input(
+			z.object({
+				roomCode: z.string().length(4),
+				playerId: z.string().min(1),
+				questionId: z.string().min(1),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				await selectSpacetimeQuestion(input);
+				return { ok: true };
+			} catch (error) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message:
+						error instanceof Error
+							? error.message
+							: "Failed to select question",
+				});
+			}
+		}),
+
+	buzz: publicProcedure
+		.input(
+			z.object({
+				roomCode: z.string().length(4),
+				playerId: z.string().min(1),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				await buzzSpacetimeGame(input);
+				return { ok: true };
+			} catch (error) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: error instanceof Error ? error.message : "Failed to buzz",
+				});
+			}
+		}),
+
+	submitAnswer: publicProcedure
+		.input(
+			z.object({
+				roomCode: z.string().length(4),
+				playerId: z.string().min(1),
+				answer: z.string().min(1),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await answerSpacetimeGame(input);
+			} catch (error) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message:
+						error instanceof Error
+							? error.message
+							: "Failed to submit answer",
+				});
+			}
+		}),
+
 	getGameState: publicProcedure
 		.input(
 			z.object({
@@ -682,71 +821,18 @@ export const gameRouter = createTRPCRouter({
 		.query(async ({ input }): Promise<GameStateSnapshot | null> => {
 			const roomCode = input.roomCode.toUpperCase();
 
-			if (canReadGameStateFromSpacetime()) {
-				try {
-					const spacetimeSnapshot =
-						await getGameStateFromSpacetimeByRoomCode(roomCode);
-					if (spacetimeSnapshot) {
-						return spacetimeSnapshot;
-					}
-				} catch (error) {
-					console.warn(
-						"[getGameState] SpacetimeDB read failed, falling back to GAME_SERVER_URL",
-						error,
-					);
-				}
+			if (!canReadGameStateFromSpacetime()) {
+				return null;
 			}
 
-			const response = await fetch(
-				`${GAME_SERVER_URL}/api/game-state/${roomCode}`,
-			);
-
-			if (!response.ok) {
-				if (response.status === 404) {
-					return null; // Game not started yet
-				}
+			try {
+				return await getGameStateFromSpacetimeByRoomCode(roomCode);
+			} catch (error) {
+				console.warn("[getGameState] SpacetimeDB read failed", error);
 				throw new TRPCError({
 					code: "INTERNAL_SERVER_ERROR",
-					message: "Failed to fetch game state",
+					message: "Failed to fetch SpacetimeDB game state",
 				});
 			}
-
-			const data = await response.json();
-
-			// Transform the data for client consumption
-			return {
-				roomId: data.roomId as string,
-				phase: data.phase as string,
-				roundType: data.roundType as string,
-				roundNumber: data.roundNumber as number,
-				totalRounds: data.totalRounds as number,
-				scores: data.scores as [string, number][],
-				board: data.board as
-					| {
-							categories: string[];
-							grid?: Array<{
-								questionId: string;
-								value: number;
-								isUsed: boolean;
-								isDailyDouble: boolean;
-								row: number;
-								col: number;
-							}>;
-					  }
-					| undefined,
-				currentQuestion: data.currentQuestion as
-					| {
-							id: string;
-							clue: string;
-							category?: string;
-							value?: number;
-					  }
-					| undefined,
-				currentPlayerId: data.currentPlayerId as string | undefined,
-				selectorPlayerId: data.selectorPlayerId as string | undefined,
-				buzzQueue: data.buzzQueue as string[],
-				timeRemaining: data.timeRemaining as number | undefined,
-				currentWager: data.currentWager as number | undefined,
-			};
 		}),
 });
