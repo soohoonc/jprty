@@ -1,5 +1,7 @@
 # SpacetimeDB Migration: Gameplay Mirror Slice
 
+> Historical note: this document captures pre-cutover migration context when gameplay state was mirrored from `apps/server`.
+
 This slice keeps Prisma + Socket.IO as the live gameplay path, but mirrors the authoritative game snapshot into the checked-in SpacetimeDB module on every game-state transition.
 
 ## What this slice adds

@@ -1,5 +1,7 @@
 # SpacetimeDB Migration: Room Mirror Slice
 
+> Historical note: this document captures pre-cutover migration context when `apps/server` mirrored runtime state.
+
 This slice keeps Prisma + Socket.IO as the live path, but starts mirroring room lifecycle data into the checked-in SpacetimeDB module.
 
 ## What this slice adds

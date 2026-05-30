@@ -9,6 +9,12 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
+    if (!SOCKET_URL) {
+      setSocket(null);
+      setIsConnected(false);
+      return;
+    }
+
     const socketInstance = io(SOCKET_URL, {
       transports: ["websocket"],
       autoConnect: true,

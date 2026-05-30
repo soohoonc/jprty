@@ -1,5 +1,7 @@
 # SpacetimeDB Migration: End-to-End Demo Path
 
+> Historical note: this document captures a pre-cutover demo path that included the legacy app-server process.
+
 This document packages the existing gameplay recording into the SpacetimeDB migration deliverable and makes the demo path explicit.
 
 ## What this demo proves

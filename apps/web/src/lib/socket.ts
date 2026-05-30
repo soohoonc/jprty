@@ -1,9 +1,9 @@
 "use client";
 
-import { io, Socket } from "socket.io-client";
-import { createContext, useContext, useEffect, useState } from "react";
+import { Socket } from "socket.io-client";
+import { createContext, useContext } from "react";
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:8080";
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
 
 interface SocketContextType {
   socket: Socket | null;
