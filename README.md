@@ -72,6 +72,7 @@ Room State
 ## SpacetimeDB migration
 
 The first hybrid SpacetimeDB migration slice is documented in `docs/spacetimedb-phase1.md`.
+The current cutover target and sequence are documented in `docs/vercel-spacetimedb-cutover.md`.
 
 - `spacetimedb/` contains the initial module scaffold for the live-room runtime.
 - The current migration work also mirrors room creation, lobby presence, and room status transitions into SpacetimeDB through an optional server-side sync path.
@@ -89,6 +90,7 @@ The first hybrid SpacetimeDB migration slice is documented in `docs/spacetimedb-
 - Start a local PostgreSQL instance on `localhost:5432` with a `jprty` database and the `postgres` user.
 - Run `bun run --cwd packages/db db:migrate` and `bun run --cwd packages/db db:seed`.
 - Vercel builds should only generate the Prisma client. Run `bun run --cwd packages/db db:deploy` once per release from a single deploy job or operator shell instead of from the parallel build graph.
+- Fly is no longer a deployment target in this repo.
 
 The DB package now loads the repo-root `.env` directly, so package-scoped commands such as `db:seed` do not require manual shell exports first.
 
