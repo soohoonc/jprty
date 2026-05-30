@@ -185,7 +185,7 @@ export async function getGameStateFromSpacetimeByRoomCode(
 
 	const gameStateRows = await querySql(
 		sqlUrl,
-		`select room_id, phase, round_type, round_number, total_rounds, selector_player_id, current_player_id, current_question_id, current_question_clue, current_question_category, current_question_value, time_remaining, current_wager from mirrored_game_state where room_id = '${escapeSqlString(roomId)}' limit 1`,
+		`select room_id, phase, round_number, total_rounds, selector_player_id, current_player_id, current_question_id, current_question_category, current_question_value, active_cell_id from live_game_state where room_id = '${escapeSqlString(roomId)}' limit 1`,
 		config.token,
 	);
 	const stateRow = gameStateRows[0];
@@ -193,17 +193,24 @@ export async function getGameStateFromSpacetimeByRoomCode(
 
 	const scoreRows = await querySql(
 		sqlUrl,
-		`select player_id, score from mirrored_game_score where room_id = '${escapeSqlString(roomId)}' order by score desc`,
+		`select player_id, score from live_game_score where room_id = '${escapeSqlString(roomId)}' order by score desc`,
 		config.token,
 	);
 	const boardRows = await querySql(
 		sqlUrl,
-		`select question_id, value, is_used, is_daily_double, row, col, category from mirrored_game_board_cell where room_id = '${escapeSqlString(roomId)}' order by row asc, col asc`,
+		`select cell_id, question_id, clue, answer, value, is_used, is_daily_double, row, col, category from live_game_board_cell where room_id = '${escapeSqlString(roomId)}' order by row asc, col asc`,
+		config.token,
+	);
+	const buzzRows = await querySql(
+		sqlUrl,
+		`select player_id, position from live_game_buzz where room_id = '${escapeSqlString(roomId)}' order by position asc`,
 		config.token,
 	);
 
 	const currentQuestionId = coerceString(stateRow.current_question_id);
-	const currentQuestionClue = coerceString(stateRow.current_question_clue);
+	const activeCellId = coerceString(stateRow.active_cell_id);
+	const activeCell = boardRows.find((row) => coerceString(row.cell_id) === activeCellId);
+	const currentQuestionClue = coerceString(activeCell?.clue);
 
 	const categoriesByColumn = new Map<number, string>();
 	for (const row of boardRows) {
@@ -229,12 +236,11 @@ export async function getGameStateFromSpacetimeByRoomCode(
 	}));
 
 	const timeRemaining = coerceNumber(stateRow.time_remaining, -1);
-	const currentWager = coerceNumber(stateRow.current_wager, -1);
 
 	return {
 		roomId: coerceString(stateRow.room_id),
 		phase: coerceString(stateRow.phase),
-		roundType: coerceString(stateRow.round_type),
+		roundType: "SINGLE_JEOPARDY",
 		roundNumber: coerceNumber(stateRow.round_number, 1),
 		totalRounds: coerceNumber(stateRow.total_rounds, 1),
 		scores: scoreRows.map((row) => [
@@ -249,15 +255,13 @@ export async function getGameStateFromSpacetimeByRoomCode(
 			? {
 					id: currentQuestionId,
 					clue: currentQuestionClue,
-					category:
-						coerceString(stateRow.current_question_category) || undefined,
+					category: coerceString(stateRow.current_question_category) || undefined,
 					value: coerceNumber(stateRow.current_question_value, 0),
 				}
 			: undefined,
 		currentPlayerId: coerceString(stateRow.current_player_id) || undefined,
 		selectorPlayerId: coerceString(stateRow.selector_player_id) || undefined,
-		buzzQueue: [],
+		buzzQueue: buzzRows.map((row) => coerceString(row.player_id)).filter(Boolean),
 		timeRemaining: timeRemaining >= 0 ? timeRemaining : undefined,
-		currentWager: currentWager >= 0 ? currentWager : undefined,
 	};
 }

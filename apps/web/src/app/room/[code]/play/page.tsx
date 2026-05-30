@@ -8,17 +8,13 @@ import { Input } from "@/components/ui/input";
 import { CountdownButton } from "@/components/ui/countdown-button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { useSocket } from "@/lib/socket";
 import { useGameMachine } from "@/lib/use-game-machine";
-import { ROOM_EVENTS } from "@jprty/shared";
 import { ChevronLeft, ChevronRight, Loader2, Star } from "lucide-react";
 
 export default function PlayerPage() {
   const params = useParams();
   const router = useRouter();
   const roomCode = params.code as string;
-  const { socket, isConnected } = useSocket();
-  const hasJoinedRef = useRef(false);
 
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [playerAnswer, setPlayerAnswer] = useState("");
@@ -32,25 +28,6 @@ export default function PlayerPage() {
     setPlayerId(localStorage.getItem("playerId"));
   }, []);
 
-  // Join room
-  useEffect(() => {
-    if (!socket || !isConnected || hasJoinedRef.current) return;
-    hasJoinedRef.current = true;
-
-    const playerName = localStorage.getItem("playerName") || "Guest";
-    socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName });
-
-    const handleJoined = (data: { player: { id: string } }) => {
-      localStorage.setItem("playerId", data.player.id);
-      setPlayerId(data.player.id);
-    };
-
-    socket.on(ROOM_EVENTS.JOINED, handleJoined);
-    socket.emit(ROOM_EVENTS.GET_STATE, { playerId: localStorage.getItem("playerId"), isHost: false });
-
-    return () => { socket.off(ROOM_EVENTS.JOINED, handleJoined); };
-  }, [socket, isConnected, roomCode]);
-
   const {
     phase, isSelecting, isReading, isBuzzing, isAnswering, isRevealing,
     isDailyDouble, isDailyDoubleAnswer, isDailyDoublePlayer, dailyDoublePlayerName,
@@ -62,7 +39,7 @@ export default function PlayerPage() {
   } = useGameMachine({
     roomCode,
     playerId,
-    enabled: !!playerId && isConnected,
+    enabled: !!playerId,
     onGameEnd: () => router.push(`/room/${roomCode}/results`),
     onError: (msg) => toast.error(msg),
   });

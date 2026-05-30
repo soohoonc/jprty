@@ -2,6 +2,7 @@
 
 import {
 	canUseDirectSpacetimeReads,
+	getPreferredLiveRuntimeBackend,
 	getSpacetimeReadConfig,
 } from "@/lib/live-runtime-config";
 import { useSocket } from "@/lib/socket";
@@ -39,9 +40,12 @@ export function useRoomRuntime(options: UseRoomRuntimeOptions = {}) {
 	const [room, setRoom] = useState<LiveRoomRuntimeSnapshot | null>(null);
 	const [player, setPlayer] = useState<Player | null>(null);
 	const [spacetimeFailed, setSpacetimeFailed] = useState(false);
+	const preferredBackend = getPreferredLiveRuntimeBackend();
 	const directSpacetimeEnabled =
 		enabled && !!roomCode && canUseDirectSpacetimeReads();
-	const useSocketFallback = !directSpacetimeEnabled || spacetimeFailed;
+	const useSocketFallback =
+		preferredBackend !== "spacetimedb" &&
+		(!directSpacetimeEnabled || spacetimeFailed);
 
 	useEffect(() => {
 		if (!directSpacetimeEnabled || !roomCode) {

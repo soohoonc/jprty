@@ -176,3 +176,4 @@ dist
 tmp
 .turbo
 spacetimedb/target/
+.vercel

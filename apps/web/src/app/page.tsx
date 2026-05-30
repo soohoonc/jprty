@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSocket } from "@/lib/socket";
 import { api } from "@/trpc/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,16 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { RoomSettings } from "@/components/game/room-settings";
-import { ROOM_EVENTS } from "@jprty/shared";
 import { useRoomRuntime } from "@/lib/use-room-runtime";
 
 export default function Home() {
   const router = useRouter();
-  const { socket, isConnected } = useSocket();
 
   const [joinCode, setJoinCode] = useState("");
   const [playerName, setPlayerName] = useState("");
-  const joinedSocketId = useRef<string | undefined>(undefined);
+  const joinedRoomCode = useRef<string | undefined>(undefined);
 
   // View mode: null = not yet determined, 'host' or 'join'
   const [viewMode, setViewMode] = useState<'host' | 'join' | null>(null);
@@ -27,6 +24,22 @@ export default function Home() {
   const createRoom = api.game.createRoom.useMutation({
     onSuccess: () => {
       localStorage.setItem("isHost", "true");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+  const joinRoom = api.game.joinRoom.useMutation({
+    onSuccess: (player) => {
+      localStorage.setItem("playerId", player.id);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+  const startGame = api.game.startGame.useMutation({
+    onSuccess: (result) => {
+      router.push(`/room/${result.roomCode}/host`);
     },
     onError: (error) => {
       toast.error(error.message);
@@ -62,24 +75,13 @@ export default function Home() {
     }
   }, [viewMode, createRoom.data, createRoom.isPending]);
 
-  // Socket setup for host
+  // Register the host as an active player in the room runtime.
   useEffect(() => {
-    if (!socket || !isConnected || !roomCode) return;
-    if (joinedSocketId.current === socket.id) return;
-
-    joinedSocketId.current = socket.id;
-    socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName: "Host", isHost: true });
-
-    const handleGameStarted = () => {
-      router.push(`/room/${roomCode}/host`);
-    };
-
-    socket.on(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
-
-    return () => {
-      socket.off(ROOM_EVENTS.GAME_STARTED, handleGameStarted);
-    };
-  }, [socket, isConnected, roomCode, router]);
+    if (!roomCode) return;
+    if (joinedRoomCode.current === roomCode) return;
+    joinedRoomCode.current = roomCode;
+    joinRoom.mutate({ roomCode, playerName: "Host" });
+  }, [roomCode, joinRoom]);
 
   const handleJoin = () => {
     if (!joinCode.trim() || !playerName.trim()) {
@@ -91,7 +93,8 @@ export default function Home() {
   };
 
   const handleStartGame = () => {
-    socket?.emit(ROOM_EVENTS.START_GAME);
+    if (!roomCode) return;
+    startGame.mutate({ roomCode });
   };
 
   // Don't render until we've determined the view mode
@@ -153,11 +156,11 @@ export default function Home() {
 
               <Button
                 onClick={handleStartGame}
-                disabled={players.length < 1 || !roomCode}
+                disabled={players.length < 1 || !roomCode || startGame.isPending}
                 className="w-full bg-yellow-500 hover:bg-yellow-600 text-blue-900 font-bold text-lg mt-4"
                 size="lg"
               >
-                Start Game
+                {startGame.isPending ? "Starting..." : "Start Game"}
               </Button>
             </div>
           </div>

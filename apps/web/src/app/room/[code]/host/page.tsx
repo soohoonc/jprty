@@ -1,31 +1,16 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { useSocket } from "@/lib/socket";
 import { useGameMachine } from "@/lib/use-game-machine";
-import { ROOM_EVENTS } from "@jprty/shared";
 import { Loader2, Star } from "lucide-react";
 
 export default function HostPage() {
   const params = useParams();
   const router = useRouter();
   const roomCode = params.code as string;
-  const { socket, isConnected } = useSocket();
-  const hasJoinedRef = useRef(false);
-
-  // Join room as host when socket connects
-  useEffect(() => {
-    if (!socket || !isConnected) return;
-    if (hasJoinedRef.current) return;
-    hasJoinedRef.current = true;
-
-    socket.emit(ROOM_EVENTS.JOIN, { roomCode, playerName: "Host", isHost: true });
-    socket.emit(ROOM_EVENTS.GET_STATE, { isHost: true });
-  }, [socket, isConnected, roomCode]);
 
   const {
     // Phase checks
@@ -51,7 +36,7 @@ export default function HostPage() {
   } = useGameMachine({
     roomCode,
     isHost: true,
-    enabled: isConnected,
+    enabled: true,
     onGameEnd: () => router.push(`/room/${roomCode}/results`),
     onError: (message) => toast.error(message),
   });

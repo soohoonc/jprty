@@ -22,16 +22,19 @@ Move JPRTY to:
 ## Current Runtime (May 30, 2026)
 
 - `apps/web` is a Next.js app intended for Vercel.
-- `apps/server` still runs a standalone Socket.IO + Hono process.
-- Authoritative gameplay still executes in server memory (`gameState`) and is mirrored into SpacetimeDB.
-- Runtime reads can be switched to SpacetimeDB via `SPACETIMEDB_READS_ENABLED=true`, with fallback to the legacy Prisma/socket bridge.
+- `apps/server` is no longer in the production gameplay path.
+- Authoritative gameplay command/read flow now runs from `apps/web` directly against SpacetimeDB live reducers/tables.
+- Runtime reads use SpacetimeDB live tables (`live_game_*`, `live_room*`) for room/game state.
 - Postgres (Prisma) owns users/auth, room/player records, question catalog, leaderboard/history.
-- `apps/web` tRPC `game.getGameState` now supports server-side mirrored reads from SpacetimeDB using private Vercel env before falling back to `GAME_SERVER_URL`.
-- `apps/web` tRPC `game.createRoom` now attempts server-side `sync_live_room` reducer provisioning in SpacetimeDB using private env before falling back to `GAME_SERVER_URL` runtime room provisioning.
-- `apps/web` tRPC `game.joinRoom`/`game.leaveRoom` now attempt server-side membership mirroring to SpacetimeDB (`sync_live_room_player`/`remove_live_room_player`) after successful Postgres writes, with warn-and-continue fallback on missing config or reducer errors.
-- Normal player entry at `apps/web/src/app/room/[code]/page.tsx` now calls `game.joinRoom` on room entry (before gameplay), caches `{roomCode, playerName, playerId}` in localStorage (`roomMembership`), and uses that cached `playerId` to call `game.leaveRoom` on explicit leave; Socket.IO `JOIN`/`LEAVE` remains in place for transitional event transport and runtime updates.
+- `apps/web` tRPC now exposes SpacetimeDB gameplay mutations:
+  - `game.startGame`
+  - `game.selectQuestion`
+  - `game.buzz`
+  - `game.submitAnswer`
+- `apps/web` `game.getGameState` now reads only SpacetimeDB when enabled (no `GAME_SERVER_URL` fallback).
+- Lobby/player pages join/leave via tRPC and consume SpacetimeDB runtime polling (no Socket.IO event requirement on the production path).
 
-## What Changed In This Pass (May 30, 2026, Phase 2 Slice)
+## What Changed In This Pass (May 30, 2026, Live Reducer Cutover Slice)
 
 - Removed Fly config (`fly.toml`) so the repo no longer advertises Fly as a backend target.
 - Kept Vercel build focused on build artifacts only (`scripts/vercel-build.sh` no longer runs `db:deploy`).
@@ -40,27 +43,25 @@ Move JPRTY to:
   - `NEXT_PUBLIC_SPACETIMEDB_URL`
   - `NEXT_PUBLIC_SPACETIMEDB_DATABASE`
   - optional `NEXT_PUBLIC_SPACETIMEDB_POLL_MS`
-- `apps/web/src/lib/use-room-runtime.ts` now attempts direct SpacetimeDB room polling only when that gate is enabled and `roomCode` is known.
-- `apps/web/src/app/room/[code]/page.tsx` keeps runtime reads enabled by `roomCode` even before Socket.IO connects, so direct SpacetimeDB reads are not blocked by socket connection state.
-- If direct read config is absent or any SpacetimeDB read fails, the hook falls back to existing Socket.IO room runtime listeners automatically.
-- `apps/web` server-side `game.getGameState` now attempts mirrored SpacetimeDB reads using private env (`SPACETIMEDB_URL`, `SPACETIMEDB_DATABASE`, `SPACETIMEDB_TOKEN`, `SPACETIMEDB_READS_ENABLED`) and falls back to `GAME_SERVER_URL` when disabled, misconfigured, missing mirrored rows, or on read errors.
-- Gameplay command/write authority (join/start/select/buzz/answer/wager/advance) remains on Socket.IO in this slice.
+- `apps/web/src/server/spacetimedb-gameplay.ts` adds reducer-backed gameplay writes for start/select/buzz/answer.
+- `apps/web/src/server/spacetimedb-game-state-read.ts` now reads live gameplay tables instead of mirrored projections.
+- `apps/web/src/lib/use-game-machine.ts` now drives gameplay through polling + tRPC mutations instead of Socket.IO gameplay events.
+- Host/player/room pages no longer emit gameplay Socket.IO events for the main production flow.
+- `NEXT_PUBLIC_LIVE_RUNTIME_BACKEND=spacetimedb` now disables Socket.IO fallback in room runtime when direct SpacetimeDB reads are enabled.
 
-## Private Vercel Web/API Read Contract
+## Private Vercel Web/API Contract (Current)
 
-- `SPACETIMEDB_READS_ENABLED=true` enables the `apps/web` server-side mirrored read attempt for `game.getGameState`.
-- Required when enabled:
+- Required:
   - `SPACETIMEDB_URL`
   - `SPACETIMEDB_DATABASE`
 - Optional:
   - `SPACETIMEDB_TOKEN`
-- These are server-only variables. Do not expose them through `NEXT_PUBLIC_*`.
-- Fallback behavior (non-breaking): `game.getGameState` uses existing `GAME_SERVER_URL` fetch when:
-  - reads are disabled (`SPACETIMEDB_READS_ENABLED` is not `true`)
-  - required SpacetimeDB config is missing
-  - room is not mirrored in `live_room`
-  - mirrored gameplay state is absent
-  - any SpacetimeDB SQL read fails
+- Browser/runtime required:
+  - `NEXT_PUBLIC_LIVE_RUNTIME_BACKEND=spacetimedb`
+  - `NEXT_PUBLIC_SPACETIMEDB_URL` (public SQL/read endpoint base, e.g. `https://maincloud.spacetimedb.com`)
+  - `NEXT_PUBLIC_SPACETIMEDB_DATABASE`
+  - optional `NEXT_PUBLIC_SPACETIMEDB_POLL_MS`
+- These values route lobby/gameplay reads to SpacetimeDB and keep Socket.IO out of the production gameplay path.
 
 ## Private Vercel Web/API Room Provisioning Contract
 
