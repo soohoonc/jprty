@@ -48,25 +48,24 @@ export function useRoomRuntime(options: UseRoomRuntimeOptions = {}) {
 			return;
 		}
 
-		setSpacetimeFailed(false);
+			setSpacetimeFailed(false);
 
-		const config = getSpacetimeReadConfig();
-		const { baseUrl, database, token, pollMs } = config;
-		if (!baseUrl || !database) {
-			setSpacetimeFailed(true);
-			return;
-		}
+			const config = getSpacetimeReadConfig();
+			const { baseUrl, database, pollMs } = config;
+			if (!baseUrl || !database) {
+				setSpacetimeFailed(true);
+				return;
+			}
 
 		let cancelled = false;
 
 		const syncRoom = async () => {
 			try {
-				const nextRoom = await getRoomByCodeFromSpacetime({
-					baseUrl,
-					database,
-					roomCode,
-					token,
-				});
+					const nextRoom = await getRoomByCodeFromSpacetime({
+						baseUrl,
+						database,
+						roomCode,
+					});
 
 				if (!cancelled) {
 					setRoom(nextRoom);

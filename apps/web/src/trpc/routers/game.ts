@@ -565,23 +565,41 @@ export const gameRouter = createTRPCRouter({
       playerId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const player = await ctx.db.player.update({
+      const existingPlayer = await ctx.db.player.findUnique({
         where: { id: input.playerId },
-        data: { isActive: false },
       });
 
-      // Decrement room player count
-      await ctx.db.room.update({
-        where: { code: input.roomCode.toUpperCase() },
-        data: {
-          numPlayers: { decrement: 1 },
+      if (!existingPlayer) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Player not found',
+        });
+      }
+
+      const shouldRemoveMirror = existingPlayer.isActive;
+      const player = shouldRemoveMirror
+        ? await ctx.db.player.update({
+            where: { id: existingPlayer.id },
+            data: { isActive: false },
+          })
+        : existingPlayer;
+
+      const activePlayerCount = await ctx.db.player.count({
+        where: {
+          roomId: existingPlayer.roomId,
+          isActive: true,
         },
+      });
+
+      await ctx.db.room.update({
+        where: { id: existingPlayer.roomId },
+        data: { numPlayers: activePlayerCount },
       });
 
       try {
         if (!canProvisionRoomInSpacetime()) {
           logMembershipMirrorSkip("leaveRoom");
-        } else {
+        } else if (shouldRemoveMirror) {
           await removeRoomPlayerInSpacetime(player.id);
         }
       } catch (error) {

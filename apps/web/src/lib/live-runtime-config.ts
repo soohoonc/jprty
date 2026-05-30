@@ -12,7 +12,6 @@ export function getSpacetimeReadConfig() {
 	return {
 		baseUrl: process.env.NEXT_PUBLIC_SPACETIMEDB_URL,
 		database: process.env.NEXT_PUBLIC_SPACETIMEDB_DATABASE,
-		token: process.env.NEXT_PUBLIC_SPACETIMEDB_TOKEN,
 		pollMs: Math.max(
 			500,
 			Number.parseInt(

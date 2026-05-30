@@ -39,7 +39,7 @@ Move JPRTY to:
   - `NEXT_PUBLIC_LIVE_RUNTIME_BACKEND=spacetimedb`
   - `NEXT_PUBLIC_SPACETIMEDB_URL`
   - `NEXT_PUBLIC_SPACETIMEDB_DATABASE`
-  - optional `NEXT_PUBLIC_SPACETIMEDB_TOKEN` and `NEXT_PUBLIC_SPACETIMEDB_POLL_MS`
+  - optional `NEXT_PUBLIC_SPACETIMEDB_POLL_MS`
 - `apps/web/src/lib/use-room-runtime.ts` now attempts direct SpacetimeDB room polling only when that gate is enabled and `roomCode` is known.
 - `apps/web/src/app/room/[code]/page.tsx` keeps runtime reads enabled by `roomCode` even before Socket.IO connects, so direct SpacetimeDB reads are not blocked by socket connection state.
 - If direct read config is absent or any SpacetimeDB read fails, the hook falls back to existing Socket.IO room runtime listeners automatically.
@@ -83,7 +83,8 @@ Move JPRTY to:
 - Server-only requirement: these variables must not be exposed via `NEXT_PUBLIC_*`.
 - Reducer calls used:
   - `sync_live_room_player(player_id, room_id, name, guest_name, is_host, is_active, score, joined_at)` after `joinRoom` creates/reactivates a player.
-  - `remove_live_room_player(player_id)` after `leaveRoom` marks the player inactive.
+  - `remove_live_room_player(player_id)` after `leaveRoom` transitions an active player to inactive.
+- `leaveRoom` is now idempotent for transitional dual-path leave handling: it deactivates only if still active, reconciles `room.numPlayers` from current active rows, and skips duplicate membership mirror removal when the player was already inactive (for example, after Socket.IO `ROOM_EVENTS.LEAVE` runs first).
 - Fallback behavior (non-breaking): if config is missing or reducer calls fail, `joinRoom`/`leaveRoom` continue their existing Postgres flow and log warnings.
 
 ## Target Runtime Split
