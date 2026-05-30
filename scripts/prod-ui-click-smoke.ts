@@ -277,10 +277,10 @@ async function main() {
     });
     result.selectedValue = selectedValue;
 
-    const clueText = await step("verify clue state visible on both pages", async () => {
+    const clueText = await step("verify clue state visible on player and host stays in gameplay", async () => {
       const clue = await readClueFromPlayer(pageB);
-      await pageA.waitForSelector("text=Get ready to buzz", { timeout: 60_000 });
-      return { clue };
+      await pageA.waitForURL(new RegExp(`/room/${roomCode}/play$`), { timeout: 60_000 });
+      return { clue, pageA: pageA.url() };
     });
 
     await pageA.screenshot({ path: OUT_CLUE_A, fullPage: true });
