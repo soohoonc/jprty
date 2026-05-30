@@ -1,5 +1,7 @@
 # SpacetimeDB Migration: Phase 1
 
+> Historical note: this document captures pre-cutover migration context when `apps/server` was still in the live path.
+
 This PR starts the hybrid SpacetimeDB migration without replacing the current auth, content, or gameplay stack.
 
 ## What this slice establishes

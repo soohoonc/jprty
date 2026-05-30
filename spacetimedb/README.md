@@ -1,13 +1,12 @@
 # SpacetimeDB Module
 
-This directory contains the live-room runtime module for the hybrid SpacetimeDB migration.
+This directory contains the live-room runtime module and source-of-truth gameplay state.
 
 ## Current scope
 
 - Give local development a stable `spacetimedb/` project path.
-- Mirror the current room lifecycle into SpacetimeDB reducers.
-- Mirror the current gameplay snapshot, scores, and board cells into SpacetimeDB reducers.
-- Keep the current app runtime on the existing Prisma + Socket.IO path while the mirror path hardens.
+- Keep room lifecycle in SpacetimeDB reducers/tables.
+- Keep authoritative gameplay snapshot, scores, and board cells in SpacetimeDB reducers/tables.
 
 ## Local workflow
 

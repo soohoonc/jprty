@@ -71,29 +71,25 @@ Room State
 
 ## SpacetimeDB migration
 
-The first hybrid SpacetimeDB migration slice is documented in `docs/spacetimedb-phase1.md`.
+The live runtime direction is now SpacetimeDB-first for room/game state.
 
-- `spacetimedb/` contains the initial module scaffold for the live-room runtime.
-- The current migration work also mirrors room creation, lobby presence, and room status transitions into SpacetimeDB through an optional server-side sync path.
-- The current branch also mirrors authoritative gameplay snapshots, scores, and board cells into SpacetimeDB through the same env-gated path.
-- `docs/spacetimedb-phase4-room-mirror.md` documents the current room-mirror slice and its env-gated runtime path.
-- `docs/spacetimedb-phase5-gameplay-mirror.md` documents the gameplay-mirror follow-up slice.
-- `docs/spacetimedb-e2e-demo.md` documents the end-to-end demo path and the remaining hosted cutover prerequisites.
-- `apps/server/src/runtime/` contains the phase-1 runtime adapter boundary that still uses Prisma + Socket.IO underneath.
-- `apps/web/src/lib/use-room-runtime.ts` is the first subscribed room-runtime consumer on the web side.
+- `spacetimedb/` contains the active backend/runtime module for live-room and gameplay state.
+- `apps/web` is the deployed app surface (Vercel target).
+- The `docs/spacetimedb-phase*.md` files are historical migration notes from pre-cutover slices.
 
 ## Local Postgres
 
 - Copy `.env.example` to `.env` at the repo root.
 - Start a local PostgreSQL instance on `localhost:5432` with a `jprty` database and the `postgres` user.
 - Run `bun run --cwd packages/db db:migrate` and `bun run --cwd packages/db db:seed`.
+- Postgres is limited to auth/users and relational app metadata.
 - Vercel builds only run the Turbo build graph and Prisma client generation. Run `bun run --cwd packages/db db:deploy` once per release from a single deploy job or operator shell instead of from the parallel build graph.
 
 ## Deploy Direction
 
 - `apps/web` targets Vercel.
-- `spacetimedb/` is the backend/runtime direction for live-room state.
-- `fly.toml` is a legacy artifact and should not be used for new backend/runtime deployment work.
+- `spacetimedb/` is the source of truth for live rooms and gameplay state.
+- Legacy Fly app-server deployment files were retired (`fly.toml`, `Dockerfile`).
 
 The DB package now loads the repo-root `.env` directly, so package-scoped commands such as `db:seed` do not require manual shell exports first.
 

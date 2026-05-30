@@ -2,35 +2,36 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../index";
 import { TRPCError } from "@trpc/server";
 
-// biome-ignore lint: port 8080 is correct for local game server
-const GAME_SERVER_URL = process.env.GAME_SERVER_URL || "http://localhost:8080";
-
-async function provisionRuntimeRoom(room: {
-  id: string;
-  code: string;
-  maxPlayers: number;
-  status: "WAITING" | "IN_GAME" | "FINISHED" | "CLOSED";
-}) {
-  const response = await fetch(`${GAME_SERVER_URL}/api/runtime/rooms/provision`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      roomId: room.id,
-      roomCode: room.code,
-      maxPlayers: room.maxPlayers,
-      status: room.status,
-      phase: "LOBBY",
-      numPlayers: 0,
-      hostConnected: false,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to provision runtime room: ${await response.text()}`);
-  }
-}
+type GameStateSnapshot = {
+  roomId: string;
+  phase: string;
+  roundType: string;
+  roundNumber: number;
+  totalRounds: number;
+  scores: [string, number][];
+  board?: {
+    categories: string[];
+    grid?: Array<{
+      questionId: string;
+      value: number;
+      isUsed: boolean;
+      isDailyDouble: boolean;
+      row: number;
+      col: number;
+    }>;
+  };
+  currentQuestion?: {
+    id: string;
+    clue: string;
+    category?: string;
+    value?: number;
+  };
+  currentPlayerId?: string;
+  selectorPlayerId?: string;
+  buzzQueue: string[];
+  timeRemaining?: number;
+  currentWager?: number;
+};
 
 export const gameRouter = createTRPCRouter({
   // Get questions for a specific question set
@@ -143,17 +144,6 @@ export const gameRouter = createTRPCRouter({
           roomId: room.id,
         },
       });
-
-      try {
-        await provisionRuntimeRoom({
-          id: room.id,
-          code: room.code,
-          maxPlayers: room.maxPlayers,
-          status: room.status,
-        });
-      } catch (error) {
-        console.warn("[createRoom] failed to provision runtime room", error);
-      }
 
       return room;
     }),
@@ -499,58 +489,12 @@ export const gameRouter = createTRPCRouter({
       return player;
     }),
 
-  // Get in-memory game state from game server
+  // Legacy game-server reads are retired. Live room/game state now belongs to SpacetimeDB.
   getGameState: publicProcedure
     .input(z.object({
       roomCode: z.string(),
     }))
-    .query(async ({ input }) => {
-      const response = await fetch(
-        `${GAME_SERVER_URL}/api/game-state/${input.roomCode.toUpperCase()}`
-      );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null; // Game not started yet
-        }
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch game state",
-        });
-      }
-
-      const data = await response.json();
-
-      // Transform the data for client consumption
-      return {
-        roomId: data.roomId as string,
-        phase: data.phase as string,
-        roundType: data.roundType as string,
-        roundNumber: data.roundNumber as number,
-        totalRounds: data.totalRounds as number,
-        scores: data.scores as [string, number][],
-        board: data.board as {
-          categories: string[];
-          grid?: Array<{
-            questionId: string;
-            value: number;
-            isUsed: boolean;
-            isDailyDouble: boolean;
-            row: number;
-            col: number;
-          }>;
-        } | undefined,
-        currentQuestion: data.currentQuestion as {
-          id: string;
-          clue: string;
-          category?: string;
-          value?: number;
-        } | undefined,
-        currentPlayerId: data.currentPlayerId as string | undefined,
-        selectorPlayerId: data.selectorPlayerId as string | undefined,
-        buzzQueue: data.buzzQueue as string[],
-        timeRemaining: data.timeRemaining as number | undefined,
-        currentWager: data.currentWager as number | undefined,
-      };
+    .query(async (): Promise<GameStateSnapshot | null> => {
+      return null;
     }),
 });
