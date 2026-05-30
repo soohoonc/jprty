@@ -29,6 +29,7 @@ Move JPRTY to:
 - `apps/web` tRPC `game.getGameState` now supports server-side mirrored reads from SpacetimeDB using private Vercel env before falling back to `GAME_SERVER_URL`.
 - `apps/web` tRPC `game.createRoom` now attempts server-side `sync_live_room` reducer provisioning in SpacetimeDB using private env before falling back to `GAME_SERVER_URL` runtime room provisioning.
 - `apps/web` tRPC `game.joinRoom`/`game.leaveRoom` now attempt server-side membership mirroring to SpacetimeDB (`sync_live_room_player`/`remove_live_room_player`) after successful Postgres writes, with warn-and-continue fallback on missing config or reducer errors.
+- Normal player entry at `apps/web/src/app/room/[code]/page.tsx` now calls `game.joinRoom` on room entry (before gameplay), caches `{roomCode, playerName, playerId}` in localStorage (`roomMembership`), and uses that cached `playerId` to call `game.leaveRoom` on explicit leave; Socket.IO `JOIN`/`LEAVE` remains in place for transitional event transport and runtime updates.
 
 ## What Changed In This Pass (May 30, 2026, Phase 2 Slice)
 
