@@ -3,7 +3,7 @@ import "server-only";
 interface SqlStmtResult {
 	schema?: {
 		elements?: Array<{
-			name?: string;
+			name?: string | { some?: string };
 		}>;
 	};
 	rows: unknown[];
@@ -99,7 +99,14 @@ function getRowElements(row: unknown): unknown[] | null {
 function getFieldNames(stmt: SqlStmtResult): string[] {
 	return (
 		stmt.schema?.elements
-			?.map((element) => element.name || "")
+			?.map((element) => {
+				const name = element.name;
+				if (typeof name === "string") return name;
+				if (name && typeof name === "object" && typeof name.some === "string") {
+					return name.some;
+				}
+				return "";
+			})
 			.filter(Boolean) || []
 	);
 }
