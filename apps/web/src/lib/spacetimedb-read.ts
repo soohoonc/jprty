@@ -151,19 +151,26 @@ export async function getRoomByCodeFromSpacetime(args: {
 	const roomId = coerceString(room.room_id);
 	const playerRows = await querySql(
 		sqlUrl,
-		`select player_id, room_id, name, guest_name, is_host, is_active, score, joined_at from live_room_player where room_id = '${escapeSqlString(roomId)}' and is_active = true order by joined_at asc`,
+		`select player_id, room_id, name, guest_name, is_host, is_active, score, joined_at from live_room_player where room_id = '${escapeSqlString(roomId)}'`,
 		args.token,
 	);
 
-	const players: LiveRoomRuntimePlayer[] = playerRows.map((player) => ({
-		id: coerceString(player.player_id),
-		name: coerceString(player.name) || undefined,
-		guestName: coerceString(player.guest_name) || undefined,
-		score: coerceNumber(player.score),
-		isHost: coerceBoolean(player.is_host),
-		isActive: coerceBoolean(player.is_active),
-		joinedAt: coerceString(player.joined_at) || undefined,
-	}));
+	const players: LiveRoomRuntimePlayer[] = playerRows
+		.map((player) => ({
+			id: coerceString(player.player_id),
+			name: coerceString(player.name) || undefined,
+			guestName: coerceString(player.guest_name) || undefined,
+			score: coerceNumber(player.score),
+			isHost: coerceBoolean(player.is_host),
+			isActive: coerceBoolean(player.is_active),
+			joinedAt: coerceString(player.joined_at) || undefined,
+		}))
+		.filter((player) => player.isActive)
+		.sort((a, b) => {
+			const aJoined = a.joinedAt ?? "";
+			const bJoined = b.joinedAt ?? "";
+			return aJoined.localeCompare(bJoined);
+		});
 
 	return {
 		backend: "spacetimedb",
