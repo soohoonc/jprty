@@ -146,6 +146,99 @@ function decodeRows(payload: Awaited<ReturnType<typeof runSql>>) {
 }
 
 async function chooseBoardQuestions() {
+	const buildValueFallbackBoard = (
+		set: {
+			id: string;
+			questions: Array<{
+				id: string;
+				clue: string;
+				answer: string;
+				value: number | null;
+			}>;
+		},
+		eligibleCategories: string[],
+	) => {
+		const byValue = new Map<
+			number,
+			Array<{
+				id: string;
+				clue: string;
+				answer: string;
+				value: number;
+			}>
+		>();
+
+		for (const boardValue of BOARD_VALUES) {
+			byValue.set(boardValue, []);
+		}
+
+		for (const question of set.questions) {
+			if (!question.value) continue;
+			if (!BOARD_VALUES.includes(question.value as (typeof BOARD_VALUES)[number])) {
+				continue;
+			}
+			const bucket = byValue.get(question.value);
+			if (!bucket) continue;
+			bucket.push({
+				id: question.id,
+				clue: question.clue,
+				answer: question.answer,
+				value: question.value,
+			});
+		}
+
+		if (
+			BOARD_VALUES.some(
+				(boardValue) =>
+					(byValue.get(boardValue)?.length ?? 0) < BOARD_CATEGORY_COUNT,
+			)
+		) {
+			return null;
+		}
+
+		const pickedIds = new Set<string>();
+		const board: Array<{
+			category: string;
+			questions: Array<{
+				id: string;
+				clue: string;
+				answer: string;
+				value: number;
+			}>;
+		}> = [];
+
+		for (let col = 0; col < BOARD_CATEGORY_COUNT; col += 1) {
+			const categoryName = eligibleCategories[col] ?? `Category ${col + 1}`;
+			const questions = BOARD_VALUES.map((boardValue) => {
+				const options = byValue.get(boardValue) ?? [];
+				const candidate =
+					options.find((question) => !pickedIds.has(question.id)) ??
+					options[0];
+				if (!candidate) {
+					return null;
+				}
+				pickedIds.add(candidate.id);
+				return candidate;
+			}).filter(Boolean) as Array<{
+				id: string;
+				clue: string;
+				answer: string;
+				value: number;
+			}>;
+
+			if (questions.length !== BOARD_VALUES.length) {
+				return null;
+			}
+
+			board.push({
+				category: categoryName,
+				questions,
+			});
+		}
+
+		return board;
+	};
+
 	const sets = await db.questionSet.findMany({
 		orderBy: { createdAt: "desc" },
 		take: 10,
@@ -223,6 +316,14 @@ async function chooseBoardQuestions() {
 
 		if (selected.length >= BOARD_CATEGORY_COUNT) {
 			return selected.slice(0, BOARD_CATEGORY_COUNT);
+		}
+
+		const fallback = buildValueFallbackBoard(set, eligibleCategories);
+		if (fallback) {
+			console.warn(
+				`[startGame] Using value-only fallback board for question set ${set.id}`,
+			);
+			return fallback;
 		}
 	}
 
