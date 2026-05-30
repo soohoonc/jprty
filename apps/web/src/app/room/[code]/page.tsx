@@ -27,7 +27,10 @@ export default function RoomPage() {
   const roomCode = params.code as string;
   const { socket, isConnected } = useSocket();
   const joinedSocketId = useRef<string | undefined>(undefined);
-  const { room: runtimeRoom, player } = useRoomRuntime({ enabled: !!roomCode && isConnected });
+  const { room: runtimeRoom, player } = useRoomRuntime({
+    roomCode,
+    enabled: !!roomCode && isConnected,
+  });
 
   const { data: room, isLoading } = api.game.getRoom.useQuery(
     { roomCode },

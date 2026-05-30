@@ -27,10 +27,18 @@ Move JPRTY to:
 - Runtime reads can be switched to SpacetimeDB via `SPACETIMEDB_READS_ENABLED=true`, with fallback to the legacy Prisma/socket bridge.
 - Postgres (Prisma) owns users/auth, room/player records, question catalog, leaderboard/history.
 
-## What Changed In This Pass
+## What Changed In This Pass (May 30, 2026, Phase 2 Slice)
 
 - Removed Fly config (`fly.toml`) so the repo no longer advertises Fly as a backend target.
 - Kept Vercel build focused on build artifacts only (`scripts/vercel-build.sh` no longer runs `db:deploy`).
+- Added a web runtime gate for direct SpacetimeDB room reads:
+  - `NEXT_PUBLIC_LIVE_RUNTIME_BACKEND=spacetimedb`
+  - `NEXT_PUBLIC_SPACETIMEDB_URL`
+  - `NEXT_PUBLIC_SPACETIMEDB_DATABASE`
+  - optional `NEXT_PUBLIC_SPACETIMEDB_TOKEN` and `NEXT_PUBLIC_SPACETIMEDB_POLL_MS`
+- `apps/web/src/lib/use-room-runtime.ts` now attempts direct SpacetimeDB room polling only when that gate is enabled and `roomCode` is known.
+- If direct read config is absent or any SpacetimeDB read fails, the hook falls back to existing Socket.IO room runtime listeners automatically.
+- Gameplay command/write authority (join/start/select/buzz/answer/wager/advance) remains on Socket.IO in this slice.
 
 ## Target Runtime Split
 
@@ -64,6 +72,12 @@ Move JPRTY to:
 2. Shift gameplay command authority to SpacetimeDB reducers; keep Vercel API routes only for auth/account/catalog/history paths.
 3. Add projection from finalized SpacetimeDB events into Postgres history/reporting tables.
 4. Remove Fly assumptions and avoid introducing any new long-lived bridge host; retire bridge-only server paths after parity.
+
+## Remaining Blockers For Full Phase 2
+
+1. Browser subscription client decision: choose official web bindings generation path and module distribution for `apps/web` (current slice uses direct SQL polling only, not realtime subscriptions).
+2. Reducer auth model for browser calls: define whether reducer access uses public anonymous identity, Better Auth user token bridging, room-scoped capability tokens, or a hybrid.
+3. Vercel-to-SpacetimeDB network policy: confirm CORS/origin + token exposure policy for browser direct calls before enabling non-read reducer paths in production.
 
 ## Risks
 

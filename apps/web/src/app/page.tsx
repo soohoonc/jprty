@@ -38,6 +38,7 @@ export default function Home() {
   const roomId = createRoom.data?.id ?? null;
 
   const { room } = useRoomRuntime({
+    roomCode,
     enabled: !!roomCode,
     onPlayerJoined: (player) => {
       toast.info(`${player.name || player.guestName} joined`);
