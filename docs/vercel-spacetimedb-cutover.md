@@ -37,6 +37,7 @@ Move JPRTY to:
   - `NEXT_PUBLIC_SPACETIMEDB_DATABASE`
   - optional `NEXT_PUBLIC_SPACETIMEDB_TOKEN` and `NEXT_PUBLIC_SPACETIMEDB_POLL_MS`
 - `apps/web/src/lib/use-room-runtime.ts` now attempts direct SpacetimeDB room polling only when that gate is enabled and `roomCode` is known.
+- `apps/web/src/app/room/[code]/page.tsx` keeps runtime reads enabled by `roomCode` even before Socket.IO connects, so direct SpacetimeDB reads are not blocked by socket connection state.
 - If direct read config is absent or any SpacetimeDB read fails, the hook falls back to existing Socket.IO room runtime listeners automatically.
 - Gameplay command/write authority (join/start/select/buzz/answer/wager/advance) remains on Socket.IO in this slice.
 

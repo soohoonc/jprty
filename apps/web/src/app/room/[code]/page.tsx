@@ -29,7 +29,7 @@ export default function RoomPage() {
   const joinedSocketId = useRef<string | undefined>(undefined);
   const { room: runtimeRoom, player } = useRoomRuntime({
     roomCode,
-    enabled: !!roomCode && isConnected,
+    enabled: !!roomCode,
   });
 
   const { data: room, isLoading } = api.game.getRoom.useQuery(
