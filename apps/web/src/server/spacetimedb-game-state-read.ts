@@ -44,6 +44,18 @@ function normalizeBaseUrl(baseUrl: string) {
 	return baseUrl.replace(/\/+$/, "");
 }
 
+function cleanEnv(value: string | undefined): string | undefined {
+	if (!value) return undefined;
+	const trimmed = value.trim();
+	if (
+		(trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+		(trimmed.startsWith("'") && trimmed.endsWith("'"))
+	) {
+		return trimmed.slice(1, -1);
+	}
+	return trimmed;
+}
+
 function escapeSqlString(value: string) {
 	return value.replace(/'/g, "''");
 }
@@ -151,11 +163,12 @@ async function querySql(
 }
 
 function getSpacetimeReadConfig() {
+	const readsEnabledRaw = cleanEnv(process.env.SPACETIMEDB_READS_ENABLED);
 	return {
-		enabled: process.env.SPACETIMEDB_READS_ENABLED === "true",
-		baseUrl: process.env.SPACETIMEDB_URL,
-		database: process.env.SPACETIMEDB_DATABASE,
-		token: process.env.SPACETIMEDB_TOKEN,
+		enabled: readsEnabledRaw === "true" || readsEnabledRaw === "1",
+		baseUrl: cleanEnv(process.env.SPACETIMEDB_URL),
+		database: cleanEnv(process.env.SPACETIMEDB_DATABASE),
+		token: cleanEnv(process.env.SPACETIMEDB_TOKEN),
 	};
 }
 
