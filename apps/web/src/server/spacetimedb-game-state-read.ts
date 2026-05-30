@@ -170,9 +170,7 @@ async function querySql(
 }
 
 function getSpacetimeReadConfig() {
-	const readsEnabledRaw = cleanEnv(process.env.SPACETIMEDB_READS_ENABLED);
 	return {
-		enabled: readsEnabledRaw === "true" || readsEnabledRaw === "1",
 		baseUrl: cleanEnv(process.env.SPACETIMEDB_URL),
 		database: cleanEnv(process.env.SPACETIMEDB_DATABASE),
 		token: cleanEnv(process.env.SPACETIMEDB_TOKEN),
@@ -181,14 +179,14 @@ function getSpacetimeReadConfig() {
 
 export function canReadGameStateFromSpacetime() {
 	const config = getSpacetimeReadConfig();
-	return Boolean(config.enabled && config.baseUrl && config.database);
+	return Boolean(config.baseUrl && config.database);
 }
 
 export async function getGameStateFromSpacetimeByRoomCode(
 	roomCode: string,
 ): Promise<RuntimeGameStateSnapshot | null> {
 	const config = getSpacetimeReadConfig();
-	if (!config.enabled || !config.baseUrl || !config.database) {
+	if (!config.baseUrl || !config.database) {
 		return null;
 	}
 
