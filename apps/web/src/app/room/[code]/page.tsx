@@ -74,7 +74,11 @@ export default function RoomPage() {
 	// Check if game already started via tRPC
 	const { data: gameState } = api.game.getGameState.useQuery(
 		{ roomCode },
-		{ enabled: !!roomCode },
+		{
+			enabled: !!roomCode,
+			refetchInterval: 2000,
+			refetchIntervalInBackground: true,
+		},
 	);
 
 	// Redirect if game is already in progress
