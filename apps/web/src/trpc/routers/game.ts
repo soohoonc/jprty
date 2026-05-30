@@ -68,7 +68,6 @@ function getServerSpacetimeReadConfig() {
 	return {
 		baseUrl: cleanEnv(process.env.SPACETIMEDB_URL),
 		database: cleanEnv(process.env.SPACETIMEDB_DATABASE),
-		token: cleanEnv(process.env.SPACETIMEDB_TOKEN),
 	};
 }
 
@@ -442,7 +441,6 @@ export const gameRouter = createTRPCRouter({
 					baseUrl: config.baseUrl,
 					database: config.database,
 					roomCode: input.roomCode.toUpperCase(),
-					token: config.token,
 				});
 			} catch (error) {
 				console.warn("[getLiveRoomRuntime] SpacetimeDB read failed", error);

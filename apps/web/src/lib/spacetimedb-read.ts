@@ -59,7 +59,16 @@ function getRowElements(row: unknown): unknown[] | null {
 function getFieldNames(stmt: SqlStmtResult): string[] {
 	return (
 		stmt.schema?.elements
-			?.map((element) => element.name || "")
+			?.map((element) => {
+				if (typeof element.name === "string") {
+					return element.name;
+				}
+				const wrapped = element.name as { some?: string } | undefined;
+				if (wrapped && typeof wrapped.some === "string") {
+					return wrapped.some;
+				}
+				return "";
+			})
 			.filter(Boolean) || []
 	);
 }
