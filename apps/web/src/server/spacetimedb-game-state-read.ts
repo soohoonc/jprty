@@ -213,27 +213,40 @@ export async function getGameStateFromSpacetimeByRoomCode(
 
 	const scoreRows = await querySql(
 		sqlUrl,
-		`select player_id, score from live_game_score where room_id = '${escapeSqlString(roomId)}' order by score desc`,
+		`select player_id, score from live_game_score where room_id = '${escapeSqlString(roomId)}'`,
 		config.token,
 	);
 	const boardRows = await querySql(
 		sqlUrl,
-		`select cell_id, question_id, clue, answer, value, is_used, is_daily_double, row, col, category from live_game_board_cell where room_id = '${escapeSqlString(roomId)}' order by row asc, col asc`,
+		`select cell_id, question_id, clue, answer, value, is_used, is_daily_double, row, col, category from live_game_board_cell where room_id = '${escapeSqlString(roomId)}'`,
 		config.token,
 	);
 	const buzzRows = await querySql(
 		sqlUrl,
-		`select player_id, position from live_game_buzz where room_id = '${escapeSqlString(roomId)}' order by position asc`,
+		`select * from live_game_buzz where room_id = '${escapeSqlString(roomId)}'`,
 		config.token,
+	);
+	const sortedScoreRows = [...scoreRows].sort(
+		(a, b) => coerceNumber(b.score) - coerceNumber(a.score),
+	);
+	const sortedBoardRows = [...boardRows].sort((a, b) => {
+		const rowDelta = coerceNumber(a.row) - coerceNumber(b.row);
+		if (rowDelta !== 0) return rowDelta;
+		return coerceNumber(a.col) - coerceNumber(b.col);
+	});
+	const sortedBuzzRows = [...buzzRows].sort(
+		(a, b) => coerceNumber(a.position) - coerceNumber(b.position),
 	);
 
 	const currentQuestionId = coerceString(stateRow.current_question_id);
 	const activeCellId = coerceString(stateRow.active_cell_id);
-	const activeCell = boardRows.find((row) => coerceString(row.cell_id) === activeCellId);
+	const activeCell = sortedBoardRows.find(
+		(row) => coerceString(row.cell_id) === activeCellId,
+	);
 	const currentQuestionClue = coerceString(activeCell?.clue);
 
 	const categoriesByColumn = new Map<number, string>();
-	for (const row of boardRows) {
+	for (const row of sortedBoardRows) {
 		const col = coerceNumber(row.col);
 		if (!categoriesByColumn.has(col)) {
 			categoriesByColumn.set(col, coerceString(row.category));
@@ -246,7 +259,7 @@ export async function getGameStateFromSpacetimeByRoomCode(
 		(index) => categoriesByColumn.get(index) || "",
 	);
 
-	const grid = boardRows.map((row) => ({
+	const grid = sortedBoardRows.map((row) => ({
 		questionId: coerceString(row.question_id),
 		value: coerceNumber(row.value),
 		isUsed: coerceBoolean(row.is_used),
@@ -263,7 +276,7 @@ export async function getGameStateFromSpacetimeByRoomCode(
 		roundType: "SINGLE_JEOPARDY",
 		roundNumber: coerceNumber(stateRow.round_number, 1),
 		totalRounds: coerceNumber(stateRow.total_rounds, 1),
-		scores: scoreRows.map((row) => [
+		scores: sortedScoreRows.map((row) => [
 			coerceString(row.player_id),
 			coerceNumber(row.score),
 		]),
@@ -281,7 +294,9 @@ export async function getGameStateFromSpacetimeByRoomCode(
 			: undefined,
 		currentPlayerId: coerceString(stateRow.current_player_id) || undefined,
 		selectorPlayerId: coerceString(stateRow.selector_player_id) || undefined,
-		buzzQueue: buzzRows.map((row) => coerceString(row.player_id)).filter(Boolean),
+		buzzQueue: sortedBuzzRows
+			.map((row) => coerceString(row.player_id))
+			.filter(Boolean),
 		timeRemaining: timeRemaining >= 0 ? timeRemaining : undefined,
 	};
 }
