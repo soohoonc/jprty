@@ -1,8 +1,11 @@
+import {
+	canReadGameStateFromSpacetime,
+	getGameStateFromSpacetimeByRoomCode,
+} from "@/server/spacetimedb-game-state-read";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../index";
-import { TRPCError } from "@trpc/server";
 
-// biome-ignore lint: port 8080 is correct for local game server
 const GAME_SERVER_URL = process.env.GAME_SERVER_URL || "http://localhost:8080";
 
 async function provisionRuntimeRoom(room: {
@@ -505,8 +508,25 @@ export const gameRouter = createTRPCRouter({
       roomCode: z.string(),
     }))
     .query(async ({ input }) => {
+      const roomCode = input.roomCode.toUpperCase();
+
+      if (canReadGameStateFromSpacetime()) {
+        try {
+          const spacetimeSnapshot =
+            await getGameStateFromSpacetimeByRoomCode(roomCode);
+          if (spacetimeSnapshot) {
+            return spacetimeSnapshot;
+          }
+        } catch (error) {
+          console.warn(
+            "[getGameState] SpacetimeDB read failed, falling back to GAME_SERVER_URL",
+            error,
+          );
+        }
+      }
+
       const response = await fetch(
-        `${GAME_SERVER_URL}/api/game-state/${input.roomCode.toUpperCase()}`
+        `${GAME_SERVER_URL}/api/game-state/${roomCode}`
       );
 
       if (!response.ok) {

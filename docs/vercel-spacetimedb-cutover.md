@@ -26,6 +26,7 @@ Move JPRTY to:
 - Authoritative gameplay still executes in server memory (`gameState`) and is mirrored into SpacetimeDB.
 - Runtime reads can be switched to SpacetimeDB via `SPACETIMEDB_READS_ENABLED=true`, with fallback to the legacy Prisma/socket bridge.
 - Postgres (Prisma) owns users/auth, room/player records, question catalog, leaderboard/history.
+- `apps/web` tRPC `game.getGameState` now supports server-side mirrored reads from SpacetimeDB using private Vercel env before falling back to `GAME_SERVER_URL`.
 
 ## What Changed In This Pass (May 30, 2026, Phase 2 Slice)
 
@@ -39,7 +40,24 @@ Move JPRTY to:
 - `apps/web/src/lib/use-room-runtime.ts` now attempts direct SpacetimeDB room polling only when that gate is enabled and `roomCode` is known.
 - `apps/web/src/app/room/[code]/page.tsx` keeps runtime reads enabled by `roomCode` even before Socket.IO connects, so direct SpacetimeDB reads are not blocked by socket connection state.
 - If direct read config is absent or any SpacetimeDB read fails, the hook falls back to existing Socket.IO room runtime listeners automatically.
+- `apps/web` server-side `game.getGameState` now attempts mirrored SpacetimeDB reads using private env (`SPACETIMEDB_URL`, `SPACETIMEDB_DATABASE`, `SPACETIMEDB_TOKEN`, `SPACETIMEDB_READS_ENABLED`) and falls back to `GAME_SERVER_URL` when disabled, misconfigured, missing mirrored rows, or on read errors.
 - Gameplay command/write authority (join/start/select/buzz/answer/wager/advance) remains on Socket.IO in this slice.
+
+## Private Vercel Web/API Read Contract
+
+- `SPACETIMEDB_READS_ENABLED=true` enables the `apps/web` server-side mirrored read attempt for `game.getGameState`.
+- Required when enabled:
+  - `SPACETIMEDB_URL`
+  - `SPACETIMEDB_DATABASE`
+- Optional:
+  - `SPACETIMEDB_TOKEN`
+- These are server-only variables. Do not expose them through `NEXT_PUBLIC_*`.
+- Fallback behavior (non-breaking): `game.getGameState` uses existing `GAME_SERVER_URL` fetch when:
+  - reads are disabled (`SPACETIMEDB_READS_ENABLED` is not `true`)
+  - required SpacetimeDB config is missing
+  - room is not mirrored in `live_room`
+  - mirrored gameplay state is absent
+  - any SpacetimeDB SQL read fails
 
 ## Target Runtime Split
 
