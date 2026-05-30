@@ -7,6 +7,7 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "spacetimedb:smoke": "bun scripts/spacetimedb-multiplayer-smoke.ts",
     "test": "bun test",
     "test:watch": "bun test --watch"
   },
