@@ -5,6 +5,8 @@ import {
 import {
 	canProvisionRoomInSpacetime,
 	provisionRoomInSpacetime,
+	removeRoomPlayerInSpacetime,
+	syncRoomPlayerInSpacetime,
 } from "@/server/spacetimedb-room-provision";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -51,6 +53,12 @@ async function provisionRuntimeRoom(room: {
 	if (!response.ok) {
 		throw new Error(`Failed to provision runtime room: ${await response.text()}`);
 	}
+}
+
+function logMembershipMirrorSkip(scope: "joinRoom" | "leaveRoom") {
+	console.warn(
+		`[${scope}] SpacetimeDB membership mirror skipped: SPACETIMEDB_URL/SPACETIMEDB_DATABASE not configured`,
+	);
 }
 
 export const gameRouter = createTRPCRouter({
@@ -217,29 +225,60 @@ export const gameRouter = createTRPCRouter({
         });
       }
 
-      // Check if user is already in the room (by name or userId)
-      const existingPlayer = room.players.find(p =>
-        (input.userId && p.userId === input.userId) ||
-        p.name === input.playerName
-      );
-
-      if (existingPlayer) {
-        // Return existing player if they're rejoining
-        return existingPlayer;
+      // Check if user is already active in the room (by name or userId)
+      let existingActivePlayer = null;
+      for (const activePlayer of room.players) {
+        if (
+          (input.userId && activePlayer.userId === input.userId) ||
+          activePlayer.name === input.playerName
+        ) {
+          existingActivePlayer = activePlayer;
+          break;
+        }
       }
 
-      // Create new player
-      const player = await ctx.db.player.create({
-        data: {
+      if (existingActivePlayer) {
+        return existingActivePlayer;
+      }
+
+      const existingInactivePlayer = await ctx.db.player.findFirst({
+        where: {
           roomId: room.id,
-          userId: input.userId,
-          name: input.playerName,
-          isActive: true,
+          isActive: false,
+          OR: [
+            ...(input.userId ? [{ userId: input.userId }] : []),
+            { name: input.playerName },
+          ],
         },
+        orderBy: { joinedAt: 'asc' },
         include: {
           user: true,
         },
       });
+
+      const player = existingInactivePlayer
+        ? await ctx.db.player.update({
+            where: { id: existingInactivePlayer.id },
+            data: {
+              isActive: true,
+              userId: input.userId ?? existingInactivePlayer.userId,
+              name: input.playerName,
+            },
+            include: {
+              user: true,
+            },
+          })
+        : await ctx.db.player.create({
+            data: {
+              roomId: room.id,
+              userId: input.userId,
+              name: input.playerName,
+              isActive: true,
+            },
+            include: {
+              user: true,
+            },
+          });
 
       // Update room player count
       await ctx.db.room.update({
@@ -248,6 +287,28 @@ export const gameRouter = createTRPCRouter({
           numPlayers: { increment: 1 },
         },
       });
+
+      try {
+        if (!canProvisionRoomInSpacetime()) {
+          logMembershipMirrorSkip("joinRoom");
+        } else {
+          await syncRoomPlayerInSpacetime({
+            playerId: player.id,
+            roomId: room.id,
+            name: player.name,
+            guestName: player.name,
+            isHost: Boolean(player.userId && room.hostId && player.userId === room.hostId),
+            isActive: true,
+            score: player.score,
+            joinedAt: player.joinedAt.toISOString(),
+          });
+        }
+      } catch (error) {
+        console.warn(
+          "[joinRoom] SpacetimeDB membership sync failed; continuing without mirror",
+          error,
+        );
+      }
 
       return player;
     }),
@@ -516,6 +577,19 @@ export const gameRouter = createTRPCRouter({
           numPlayers: { decrement: 1 },
         },
       });
+
+      try {
+        if (!canProvisionRoomInSpacetime()) {
+          logMembershipMirrorSkip("leaveRoom");
+        } else {
+          await removeRoomPlayerInSpacetime(player.id);
+        }
+      } catch (error) {
+        console.warn(
+          "[leaveRoom] SpacetimeDB membership remove failed; continuing without mirror",
+          error,
+        );
+      }
 
       return player;
     }),

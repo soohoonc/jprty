@@ -28,6 +28,7 @@ Move JPRTY to:
 - Postgres (Prisma) owns users/auth, room/player records, question catalog, leaderboard/history.
 - `apps/web` tRPC `game.getGameState` now supports server-side mirrored reads from SpacetimeDB using private Vercel env before falling back to `GAME_SERVER_URL`.
 - `apps/web` tRPC `game.createRoom` now attempts server-side `sync_live_room` reducer provisioning in SpacetimeDB using private env before falling back to `GAME_SERVER_URL` runtime room provisioning.
+- `apps/web` tRPC `game.joinRoom`/`game.leaveRoom` now attempt server-side membership mirroring to SpacetimeDB (`sync_live_room_player`/`remove_live_room_player`) after successful Postgres writes, with warn-and-continue fallback on missing config or reducer errors.
 
 ## What Changed In This Pass (May 30, 2026, Phase 2 Slice)
 
@@ -70,6 +71,19 @@ Move JPRTY to:
 - Server-only requirement: these variables must not be exposed via `NEXT_PUBLIC_*`.
 - Reducer call used: `sync_live_room(room_id, room_code, status, phase, max_players, num_players, host_connected)`.
 - Fallback behavior (non-breaking): if config is missing, disabled by omission, or SpacetimeDB reducer call fails, `game.createRoom` uses existing `GAME_SERVER_URL/api/runtime/rooms/provision`.
+
+## Private Vercel Web/API Membership Mirroring Contract
+
+- `apps/web` membership mutations attempt SpacetimeDB reducer calls when both are set:
+  - `SPACETIMEDB_URL`
+  - `SPACETIMEDB_DATABASE`
+- Optional:
+  - `SPACETIMEDB_TOKEN` (Bearer auth for reducer calls)
+- Server-only requirement: these variables must not be exposed via `NEXT_PUBLIC_*`.
+- Reducer calls used:
+  - `sync_live_room_player(player_id, room_id, name, guest_name, is_host, is_active, score, joined_at)` after `joinRoom` creates/reactivates a player.
+  - `remove_live_room_player(player_id)` after `leaveRoom` marks the player inactive.
+- Fallback behavior (non-breaking): if config is missing or reducer calls fail, `joinRoom`/`leaveRoom` continue their existing Postgres flow and log warnings.
 
 ## Target Runtime Split
 
