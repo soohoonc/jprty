@@ -75,7 +75,9 @@ The live runtime direction is now SpacetimeDB-first for room/game state.
 
 - `spacetimedb/` contains the active backend/runtime module for live-room and gameplay state.
 - `apps/web` is the deployed app surface (Vercel target).
-- The `docs/spacetimedb-phase*.md` files are historical migration notes from pre-cutover slices.
+- Server-side room provisioning and membership sync write to SpacetimeDB when `SPACETIMEDB_URL` and `SPACETIMEDB_DATABASE` are configured.
+- With `SPACETIMEDB_READS_ENABLED=true`, room/game snapshot reads prefer SpacetimeDB and fall back to the legacy bridge only when configured reads fail.
+- The `docs/spacetimedb-phase*.md` files are historical migration notes from pre-cutover slices. `docs/vercel-spacetimedb-cutover.md` records the current cutover sequence.
 
 ## Local Postgres
 

@@ -2,7 +2,7 @@ import { Server, Socket } from "socket.io";
 import { db } from "@jprty/db";
 import { GAME_EVENTS, ROOM_EVENTS } from "@jprty/shared";
 import { gameState } from "../game/state";
-import { gameRuntime, liveRoomRuntime, spacetimeMirror } from "../runtime";
+import { gameRuntime, liveRoomRuntime, spacetimeMirror, spacetimeRead } from "../runtime";
 
 function getSocketRoomId(socket: Socket) {
   const rooms = Array.from(socket.rooms).filter((roomId) => roomId !== socket.id);
@@ -134,8 +134,14 @@ export function room(io: Server, socket: Socket) {
           playerId: data?.playerId,
         });
 
-        const room = await liveRoomRuntime.getSnapshot(roomId);
-        socket.emit(ROOM_EVENTS.STATE, gameRuntime.buildRoomState(room, gameState.getSnapshot(roomId)));
+        const room = await liveRoomRuntime.getSnapshot(roomId, { source: "auto" });
+        const stateSnapshot = spacetimeRead.isEnabled()
+          ? await spacetimeRead.getGameSnapshotByRoomId(roomId).catch(() => null)
+          : null;
+        socket.emit(
+          ROOM_EVENTS.STATE,
+          gameRuntime.buildRoomState(room, stateSnapshot || gameState.getSnapshot(roomId)),
+        );
       } catch (error: any) {
         console.error("room:get_state error:", error);
         socket.emit(ROOM_EVENTS.ERROR, { message: error.message });

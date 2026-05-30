@@ -35,6 +35,7 @@ spacetime publish --server local --project-path spacetimedb jprty-room-runtime
 - `select_live_game_cell`
 - `buzz_live_game`
 - `submit_live_game_answer`
+- `init`
 
 ## Live tables
 
@@ -49,6 +50,7 @@ spacetime publish --server local --project-path spacetimedb jprty-room-runtime
 
 - `sync_mirrored_game_state`
 - `sync_mirrored_game_score`
+- `remove_mirrored_game_score`
 - `sync_mirrored_game_board_cell`
 - `mirrored_game_state`
 - `mirrored_game_score`

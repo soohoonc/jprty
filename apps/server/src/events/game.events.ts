@@ -3,7 +3,7 @@ import { db } from '@jprty/db';
 import { GAME_EVENTS } from '@jprty/shared';
 import { roomManager } from '../game/rooms';
 import { gameState } from '../game/state';
-import { gameRuntime } from '../runtime';
+import { gameRuntime, spacetimeRead } from '../runtime';
 
 function broadcastState(io: Server, roomId: string): void {
   const payload = gameRuntime.buildStateUpdate(gameState.getSnapshot(roomId));
@@ -14,14 +14,18 @@ function broadcastState(io: Server, roomId: string): void {
 
 export function game(io: Server, socket: Socket) {
   // Get current game state
-  socket.on(GAME_EVENTS.GET_STATE, () => {
+  socket.on(GAME_EVENTS.GET_STATE, async () => {
     try {
       const connection = roomManager.getConnection(socket.id);
       if (!connection) throw new Error('Not in a room');
 
+      const stateSnapshot = spacetimeRead.isEnabled()
+        ? await spacetimeRead.getGameSnapshotByRoomId(connection.roomId).catch(() => null)
+        : null;
+
       socket.emit(
         GAME_EVENTS.STATE_UPDATE,
-        gameRuntime.buildStateUpdate(gameState.getSnapshot(connection.roomId)),
+        gameRuntime.buildStateUpdate(stateSnapshot || gameState.getSnapshot(connection.roomId)),
       );
     } catch (error: any) {
       socket.emit(GAME_EVENTS.ERROR, { message: error.message });
