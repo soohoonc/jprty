@@ -103,7 +103,9 @@ describe("spacetimedb-room-provision", () => {
 		process.env.SPACETIMEDB_TOKEN = "";
 
 		globalThis.fetch = (() =>
-			Promise.resolve(new Response("boom", { status: 500 }))) as typeof fetch;
+			Promise.resolve(
+				new Response("boom", { status: 500 }),
+			)) as unknown as typeof fetch;
 
 		await expect(
 			provisionRoomInSpacetime({
