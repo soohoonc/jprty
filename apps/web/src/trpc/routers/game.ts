@@ -2,6 +2,10 @@ import {
 	canReadGameStateFromSpacetime,
 	getGameStateFromSpacetimeByRoomCode,
 } from "@/server/spacetimedb-game-state-read";
+import {
+	canProvisionRoomInSpacetime,
+	provisionRoomInSpacetime,
+} from "@/server/spacetimedb-room-provision";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../index";
@@ -9,30 +13,44 @@ import { createTRPCRouter, publicProcedure } from "../index";
 const GAME_SERVER_URL = process.env.GAME_SERVER_URL || "http://localhost:8080";
 
 async function provisionRuntimeRoom(room: {
-  id: string;
-  code: string;
-  maxPlayers: number;
-  status: "WAITING" | "IN_GAME" | "FINISHED" | "CLOSED";
+	id: string;
+	code: string;
+	maxPlayers: number;
+	status: "WAITING" | "IN_GAME" | "FINISHED" | "CLOSED";
 }) {
-  const response = await fetch(`${GAME_SERVER_URL}/api/runtime/rooms/provision`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      roomId: room.id,
-      roomCode: room.code,
-      maxPlayers: room.maxPlayers,
-      status: room.status,
-      phase: "LOBBY",
-      numPlayers: 0,
-      hostConnected: false,
-    }),
-  });
+	if (canProvisionRoomInSpacetime()) {
+		try {
+			const provisioned = await provisionRoomInSpacetime(room);
+			if (provisioned) {
+				return;
+			}
+		} catch (error) {
+			console.warn(
+				"[createRoom] SpacetimeDB room provisioning failed, falling back to GAME_SERVER_URL",
+				error,
+			);
+		}
+	}
 
-  if (!response.ok) {
-    throw new Error(`Failed to provision runtime room: ${await response.text()}`);
-  }
+	const response = await fetch(`${GAME_SERVER_URL}/api/runtime/rooms/provision`, {
+		method: "POST",
+		headers: {
+			"content-type": "application/json",
+		},
+		body: JSON.stringify({
+			roomId: room.id,
+			roomCode: room.code,
+			maxPlayers: room.maxPlayers,
+			status: room.status,
+			phase: "LOBBY",
+			numPlayers: 0,
+			hostConnected: false,
+		}),
+	});
+
+	if (!response.ok) {
+		throw new Error(`Failed to provision runtime room: ${await response.text()}`);
+	}
 }
 
 export const gameRouter = createTRPCRouter({

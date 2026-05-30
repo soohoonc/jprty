@@ -27,6 +27,7 @@ Move JPRTY to:
 - Runtime reads can be switched to SpacetimeDB via `SPACETIMEDB_READS_ENABLED=true`, with fallback to the legacy Prisma/socket bridge.
 - Postgres (Prisma) owns users/auth, room/player records, question catalog, leaderboard/history.
 - `apps/web` tRPC `game.getGameState` now supports server-side mirrored reads from SpacetimeDB using private Vercel env before falling back to `GAME_SERVER_URL`.
+- `apps/web` tRPC `game.createRoom` now attempts server-side `sync_live_room` reducer provisioning in SpacetimeDB using private env before falling back to `GAME_SERVER_URL` runtime room provisioning.
 
 ## What Changed In This Pass (May 30, 2026, Phase 2 Slice)
 
@@ -58,6 +59,17 @@ Move JPRTY to:
   - room is not mirrored in `live_room`
   - mirrored gameplay state is absent
   - any SpacetimeDB SQL read fails
+
+## Private Vercel Web/API Room Provisioning Contract
+
+- `apps/web` `game.createRoom` attempts direct SpacetimeDB provisioning first when both are set:
+  - `SPACETIMEDB_URL`
+  - `SPACETIMEDB_DATABASE`
+- Optional:
+  - `SPACETIMEDB_TOKEN` (Bearer auth for reducer calls)
+- Server-only requirement: these variables must not be exposed via `NEXT_PUBLIC_*`.
+- Reducer call used: `sync_live_room(room_id, room_code, status, phase, max_players, num_players, host_connected)`.
+- Fallback behavior (non-breaking): if config is missing, disabled by omission, or SpacetimeDB reducer call fails, `game.createRoom` uses existing `GAME_SERVER_URL/api/runtime/rooms/provision`.
 
 ## Target Runtime Split
 
