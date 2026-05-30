@@ -87,7 +87,13 @@ The first hybrid SpacetimeDB migration slice is documented in `docs/spacetimedb-
 - Copy `.env.example` to `.env` at the repo root.
 - Start a local PostgreSQL instance on `localhost:5432` with a `jprty` database and the `postgres` user.
 - Run `bun run --cwd packages/db db:migrate` and `bun run --cwd packages/db db:seed`.
-- Vercel builds should only generate the Prisma client. Run `bun run --cwd packages/db db:deploy` once per release from a single deploy job or operator shell instead of from the parallel build graph.
+- Vercel builds only run the Turbo build graph and Prisma client generation. Run `bun run --cwd packages/db db:deploy` once per release from a single deploy job or operator shell instead of from the parallel build graph.
+
+## Deploy Direction
+
+- `apps/web` targets Vercel.
+- `spacetimedb/` is the backend/runtime direction for live-room state.
+- `fly.toml` is a legacy artifact and should not be used for new backend/runtime deployment work.
 
 The DB package now loads the repo-root `.env` directly, so package-scoped commands such as `db:seed` do not require manual shell exports first.
 
