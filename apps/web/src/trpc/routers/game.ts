@@ -2,6 +2,7 @@ import {
 	canReadGameStateFromSpacetime,
 	getGameStateFromSpacetimeByRoomCode,
 } from "@/server/spacetimedb-game-state-read";
+import { getRoomByCodeFromSpacetime } from "@/lib/spacetimedb-read";
 import {
 	answerSpacetimeGame,
 	buzzSpacetimeGame,
@@ -50,6 +51,26 @@ type GameStateSnapshot = {
 };
 
 const GAME_SERVER_URL = process.env.GAME_SERVER_URL || "http://localhost:8080";
+
+function cleanEnv(value: string | undefined): string | undefined {
+	if (!value) return undefined;
+	const trimmed = value.trim();
+	if (
+		(trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+		(trimmed.startsWith("'") && trimmed.endsWith("'"))
+	) {
+		return trimmed.slice(1, -1);
+	}
+	return trimmed;
+}
+
+function getServerSpacetimeReadConfig() {
+	return {
+		baseUrl: cleanEnv(process.env.SPACETIMEDB_URL),
+		database: cleanEnv(process.env.SPACETIMEDB_DATABASE),
+		token: cleanEnv(process.env.SPACETIMEDB_TOKEN),
+	};
+}
 
 async function provisionRuntimeRoom(room: {
 	id: string;
@@ -398,6 +419,38 @@ export const gameRouter = createTRPCRouter({
 			}
 
 			return room;
+		}),
+
+	getLiveRoomRuntime: publicProcedure
+		.input(
+			z.object({
+				roomCode: z.string().length(4),
+			}),
+		)
+		.query(async ({ input }) => {
+			const config = getServerSpacetimeReadConfig();
+			if (!config.baseUrl || !config.database) {
+				throw new TRPCError({
+					code: "PRECONDITION_FAILED",
+					message:
+						"SpacetimeDB runtime reads are not configured on the server.",
+				});
+			}
+
+			try {
+				return await getRoomByCodeFromSpacetime({
+					baseUrl: config.baseUrl,
+					database: config.database,
+					roomCode: input.roomCode.toUpperCase(),
+					token: config.token,
+				});
+			} catch (error) {
+				console.warn("[getLiveRoomRuntime] SpacetimeDB read failed", error);
+				throw new TRPCError({
+					code: "INTERNAL_SERVER_ERROR",
+					message: "Failed to fetch SpacetimeDB live room runtime",
+				});
+			}
 		}),
 
 	// Update room configuration (host only - no auth check since host is not logged in)
