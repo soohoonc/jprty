@@ -5,9 +5,19 @@
 Move JPRTY to:
 
 - Vercel-hosted frontend (`apps/web`).
+- Vercel-hosted API surface for auth/accounts/catalog/history endpoints.
 - SpacetimeDB-owned live room/game runtime.
 - Postgres only for auth/accounts/question catalog/history.
+- No new long-lived backend provider.
 - No Fly deployment target in this repo.
+
+## Recorded Hosting Decision (May 30, 2026)
+
+- Keep Vercel as the only web/API hosting surface.
+- Use SpacetimeDB as the authoritative realtime/game backend.
+- Keep Postgres only for auth/accounts/question catalog/history/projection data.
+- Do not add another long-lived backend provider.
+- Do not use Fly for this cutover.
 
 ## Current Runtime (May 30, 2026)
 
@@ -48,6 +58,13 @@ Move JPRTY to:
 6. Remove bridge-only runtime code (`apps/server/src/events/*`, in-memory `gameState`) after parity and soak.
 7. Keep Postgres writes for history/accounting as async projection from finalized runtime events.
 
+## Phase 2 Plan (Short)
+
+1. Wire `apps/web` to SpacetimeDB subscriptions/reducers for room/game state while Socket.IO remains fallback-gated.
+2. Shift gameplay command authority to SpacetimeDB reducers; keep Vercel API routes only for auth/account/catalog/history paths.
+3. Add projection from finalized SpacetimeDB events into Postgres history/reporting tables.
+4. Remove Fly assumptions and avoid introducing any new long-lived bridge host; retire bridge-only server paths after parity.
+
 ## Risks
 
 - Race/ordering differences when moving from single-process memory state to reducer-driven state.
@@ -57,9 +74,8 @@ Move JPRTY to:
 
 ## Product + Architecture Questions To Resolve
 
-1. Hosting: where will the temporary bridge (`apps/server`) run while Socket.IO is still needed, if not Fly?
-2. Authority model: should game timers be reducer-owned (SpacetimeDB clock/event model) or client-triggered with server validation?
-3. Identity: for anonymous players, what stable identity should map reconnects and score ownership across tabs/devices?
-4. Projection policy: what gameplay milestones must be persisted to Postgres synchronously vs asynchronously?
-5. Abuse controls: do reducer calls need authenticated user tokens, room-scoped host capability tokens, or both?
-6. Rollout: should read-cutover (`SPACETIMEDB_READS_ENABLED`) be global, room-scoped, or percentage-based?
+1. Authority model: should game timers be reducer-owned (SpacetimeDB clock/event model) or client-triggered with server validation?
+2. Identity: for anonymous players, what stable identity should map reconnects and score ownership across tabs/devices?
+3. Projection policy: what gameplay milestones must be persisted to Postgres synchronously vs asynchronously?
+4. Abuse controls: do reducer calls need authenticated user tokens, room-scoped host capability tokens, or both?
+5. Rollout: should read-cutover (`SPACETIMEDB_READS_ENABLED`) be global, room-scoped, or percentage-based?
