@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,11 @@ export default function HostPage() {
   const params = useParams();
   const router = useRouter();
   const roomCode = params.code as string;
+  const [playerId, setPlayerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPlayerId(localStorage.getItem("playerId"));
+  }, []);
 
   const {
     // Phase checks
@@ -33,8 +39,13 @@ export default function HostPage() {
     correctAnswer,
     // Loading
     isLoading,
+    // Selection
+    isSelector,
+    selectorPlayerName,
+    selectQuestion,
   } = useGameMachine({
     roomCode,
+    playerId,
     isHost: true,
     enabled: true,
     onGameEnd: () => router.push(`/room/${roomCode}/results`),
@@ -75,6 +86,19 @@ export default function HostPage() {
                   const questionId = board.questionIds[cellKey];
                   const isAnswered = questionId ? board.answeredQuestions?.has(questionId) : true;
 
+                  if (isSelector && !isAnswered && questionId) {
+                    return (
+                      <button
+                        key={cellKey}
+                        type="button"
+                        onClick={() => selectQuestion(questionId)}
+                        className="w-full h-16 flex items-center justify-center text-xl font-bold bg-blue-700 hover:bg-blue-600 text-yellow-400 transition-colors"
+                      >
+                        ${value}
+                      </button>
+                    );
+                  }
+
                   return (
                     <div
                       key={cellKey}
@@ -88,6 +112,12 @@ export default function HostPage() {
                 })}
               </div>
             ))}
+          </div>
+        )}
+
+        {isSelecting && !currentQuestion && !isSelector && (
+          <div className="mt-6 text-center text-yellow-300 text-lg font-semibold">
+            {selectorPlayerName || "Player"} is choosing
           </div>
         )}
 
