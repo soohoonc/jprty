@@ -252,9 +252,8 @@ async function main() {
     await step("both pages reach gameplay view", async () => {
       await pageB.waitForURL(new RegExp(`/room/${roomCode}/play$`), { timeout: 60_000 });
       await pageB.waitForSelector("text=is choosing", { timeout: 90_000 });
-      await pageA.goto(`${WEB_URL}/room/${roomCode}/play`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-      await pageA.waitForURL(new RegExp(`/room/${roomCode}/play$`), { timeout: 60_000 });
-      await pageA.waitForSelector("button:has-text('$')", { timeout: 90_000 });
+      await pageA.waitForURL(new RegExp(`/room/${roomCode}/host$`), { timeout: 60_000 });
+      await pageA.waitForSelector("span.text-white.text-sm.font-mono", { timeout: 90_000 });
       return {
         pageA: pageA.url(),
         pageB: pageB.url(),
@@ -264,11 +263,12 @@ async function main() {
     await pageA.screenshot({ path: OUT_GAMEPLAY_A, fullPage: true });
     await pageB.screenshot({ path: OUT_GAMEPLAY_B, fullPage: true });
 
-    const selectedValue = await step("select clue from board UI click on page A", async () => {
+    const selectedValue = await step("select clue from host route UI on page A", async () => {
       const clueButton = pageA
         .locator("button")
         .filter({ hasText: /^\$\d+$/ })
         .first();
+      await clueButton.waitFor({ timeout: 90_000 });
       const value = (await clueButton.innerText()).trim();
       await clueButton.click();
       await pageB.waitForSelector("text=Get ready to buzz", { timeout: 60_000 });
@@ -279,7 +279,7 @@ async function main() {
 
     const clueText = await step("verify clue state visible on player and host stays in gameplay", async () => {
       const clue = await readClueFromPlayer(pageB);
-      await pageA.waitForURL(new RegExp(`/room/${roomCode}/play$`), { timeout: 60_000 });
+      await pageA.waitForURL(new RegExp(`/room/${roomCode}/host$`), { timeout: 60_000 });
       return { clue, pageA: pageA.url() };
     });
 

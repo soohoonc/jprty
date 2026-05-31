@@ -234,7 +234,7 @@ export function useGameMachine({
 		isDailyDoubleAnswer: state.matches("dailyDoubleAnswer"),
 		isMyTurn: ctx.buzzedPlayerId !== null && ctx.buzzedPlayerId === ctx.playerId,
 		isSelector:
-			!ctx.isHost &&
+			ctx.playerId !== null &&
 			ctx.selectorPlayerId !== null &&
 			ctx.selectorPlayerId === ctx.playerId,
 		isDailyDoublePlayer:
