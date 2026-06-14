@@ -166,7 +166,7 @@ export default function Home() {
           </div>
 
           <div className="text-center mt-4">
-            <Button variant="link" onClick={() => setViewMode('join')} className="text-white/70 hover:text-white">
+            <Button variant="link" onClick={() => setViewMode('join')} className="text-white underline hover:text-yellow-400">
               Join a game instead
             </Button>
           </div>
