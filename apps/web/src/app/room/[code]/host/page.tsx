@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useGameMachine } from "@/lib/use-game-machine";
 import { Loader2, Star } from "lucide-react";
+import { HostRoomCode } from "@/components/game/host-room-code";
 
 export default function HostPage() {
   const params = useParams();
@@ -67,7 +68,7 @@ export default function HostPage() {
     <div className="min-h-screen bg-blue-900 p-4">
       <div className="max-w-6xl mx-auto">
         <div className="mb-4 text-center">
-          <span className="text-white text-sm font-mono">{roomCode}</span>
+          <HostRoomCode roomCode={roomCode} codeClassName="text-sm" />
         </div>
 
         {/* Game Board - Display Only */}
