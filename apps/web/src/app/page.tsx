@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { HostRoomCode } from "@/components/game/host-room-code";
 import { RoomSettings } from "@/components/game/room-settings";
 import { useRoomRuntime } from "@/lib/use-room-runtime";
 
@@ -122,7 +123,7 @@ export default function Home() {
                 </div>
                 <div className="p-6 text-center">
                   {roomCode ? (
-                    <span className="text-5xl font-mono font-bold tracking-widest text-white">{roomCode}</span>
+                    <HostRoomCode roomCode={roomCode} codeClassName="text-5xl" />
                   ) : (
                     <span className="text-2xl text-white/50">Creating...</span>
                   )}
